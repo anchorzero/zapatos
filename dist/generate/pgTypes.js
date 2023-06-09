@@ -51,12 +51,12 @@ const baseTsTypeForBasePgType = (pgType, enums, context) => {
         case 'uuid':
         case 'inet':
         case 'name':
+        case 'numeric':
             return 'string';
         case 'int2':
         case 'int4':
         case 'float4':
         case 'float8':
-        case 'numeric':
         case 'oid':
             return 'number';
         case 'bool':
