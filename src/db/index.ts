@@ -13,9 +13,4 @@ export { registerDeserializeHook, registerSerdeHook, registerSerdeHooksForTable,
 export * from './shortcuts';
 export * from './transaction';
 export { mapWithSeparator } from './utils';
-
-import { types } from 'pg';
-
-const JSONBigNative = require('json-bigint')({ useNativeBigInt: true });
-types.setTypeParser(types.builtins.JSONB, JSONBigNative.parse);
 export * as conditions from './conditions';
