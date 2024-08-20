@@ -1,11 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerSerdeHooksForTable = exports.registerSerdeHook = exports.registerSerializeHook = exports.registerDeserializeHook = exports.applySerializeHook = exports.applyDeserializeHook = exports.applyHookForWhere = exports.TYPE_HOOK = void 0;
+exports.registerPreamble = exports.setGenerateTypes = exports.registerSerdeHooksForTable = exports.registerSerdeHook = exports.registerSerializeHook = exports.registerDeserializeHook = exports.applySerializeHook = exports.applyDeserializeHook = exports.applyHookForWhere = exports.PREAMBLE = exports.TYPE_HOOK = void 0;
 const core_1 = require("./core");
 // TODO: narrow these types
 const DESERIALIZE_HOOK = {};
 const SERIALIZE_HOOK = {};
 exports.TYPE_HOOK = {};
+exports.PREAMBLE = [];
+//
+var GENERATE_TYPES = false;
 function applyHook(hook, table, values, lateral) {
     return (Array.isArray(values)
         ? values.map((v) => applyHookSingle(hook, table, v, lateral))
@@ -99,7 +102,7 @@ function registerSerdeHook(table, column, { serialize, deserialize, type }) {
     if (serialize) {
         registerSerializeHook(table, column, serialize);
     }
-    if (type) {
+    if (type && GENERATE_TYPES) {
         registerTypeHook(table, column, type);
     }
 }
@@ -118,3 +121,11 @@ function registerSerdeHooksForTable(table, map) {
     }
 }
 exports.registerSerdeHooksForTable = registerSerdeHooksForTable;
+function setGenerateTypes(flag) {
+    GENERATE_TYPES = flag;
+}
+exports.setGenerateTypes = setGenerateTypes;
+function registerPreamble(str) {
+    exports.PREAMBLE.push(str);
+}
+exports.registerPreamble = registerPreamble;

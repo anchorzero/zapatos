@@ -18,6 +18,10 @@ export interface Hook<U, V> {
 const DESERIALIZE_HOOK: Hook<any, any> = {};
 const SERIALIZE_HOOK: Hook<any, any> = {};
 export const TYPE_HOOK: { [t: Table]: { [c: Column]: string } } = {};
+export const PREAMBLE: string[] = [];
+
+//
+var GENERATE_TYPES = false;
 
 type InsertableOrSelectableForTable<T extends Table> =
   | InsertableForTable<T>
@@ -166,7 +170,7 @@ export function registerSerdeHook<T extends Table, U>(
   if (serialize) {
     registerSerializeHook(table, column, serialize);
   }
-  if (type) {
+  if (type && GENERATE_TYPES) {
     registerTypeHook(table, column, type);
   }
 }
@@ -191,4 +195,12 @@ export function registerSerdeHooksForTable<T extends Table>(
       registerSerdeHook(table, column, serde);
     }
   }
+}
+
+export function setGenerateTypes(flag: boolean) {
+  GENERATE_TYPES = flag;
+}
+
+export function registerPreamble(str: string) {
+  PREAMBLE.push(str);
 }

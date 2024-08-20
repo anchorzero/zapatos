@@ -10,6 +10,7 @@ const pg = require("pg");
 const enums_1 = require("./enums");
 const header_1 = require("./header");
 const tables_1 = require("./tables");
+const serde_1 = require("../db/serde");
 const canaryVersion = 104, versionCanary = `
 // got a type error on schemaVersionCanary below? update by running \`npx zapatos\`
 export interface schemaVersionCanary extends db.SchemaVersionCanary { version: ${canaryVersion} }
@@ -66,7 +67,7 @@ const tsForConfig = async (config, debug) => {
         return { schemaDef, tables };
     }))), schemaDefs = schemaData.map(r => r.schemaDef), schemaTables = schemaData.map(r => r.tables), allTables = [].concat(...schemaTables), hasCustomTypes = Object.keys(customTypes).length > 0, ts = (0, header_1.header)() + declareModule('zapatos/schema', `\nimport type * as db from 'zapatos/db';\n` +
         (hasCustomTypes ? `import type * as c from 'zapatos/custom';\n` : ``) +
-        config.preamble.join('\n') +
+        (serde_1.PREAMBLE.length ? serde_1.PREAMBLE : config.preamble.length ? config.preamble : []).join('\n') +
         versionCanary + '\n\n' +
         schemaDefs.join('\n\n') +
         `\n\n/* === global aggregate types === */\n` +
