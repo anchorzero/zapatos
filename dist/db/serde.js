@@ -1,10 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerSerdeHooksForTable = exports.registerSerdeHook = exports.registerSerializeHook = exports.registerDeserializeHook = exports.applySerializeHook = exports.applyDeserializeHook = exports.applyHookForWhere = void 0;
+exports.registerPreamble = exports.setGenerateTypes = exports.registerSerdeHooksForTable = exports.registerSerdeHook = exports.registerSerializeHook = exports.registerDeserializeHook = exports.applySerializeHook = exports.applyDeserializeHook = exports.applyHookForWhere = exports.PREAMBLE = exports.TYPE_HOOK = void 0;
 const core_1 = require("./core");
 // TODO: narrow these types
 const DESERIALIZE_HOOK = {};
 const SERIALIZE_HOOK = {};
+exports.TYPE_HOOK = {};
+exports.PREAMBLE = [];
+//
+var GENERATE_TYPES = false;
 function applyHook(hook, table, values, lateral) {
     return (Array.isArray(values)
         ? values.map((v) => applyHookSingle(hook, table, v, lateral))
@@ -91,15 +95,24 @@ function registerSerializeHook(table, column, f) {
     registerHook(SERIALIZE_HOOK, table, column, f);
 }
 exports.registerSerializeHook = registerSerializeHook;
-function registerSerdeHook(table, column, { serialize, deserialize }) {
+function registerSerdeHook(table, column, { serialize, deserialize, type }) {
     if (deserialize) {
         registerDeserializeHook(table, column, deserialize);
     }
     if (serialize) {
         registerSerializeHook(table, column, serialize);
     }
+    if (type && GENERATE_TYPES) {
+        registerTypeHook(table, column, type);
+    }
 }
 exports.registerSerdeHook = registerSerdeHook;
+function registerTypeHook(table, column, type) {
+    if (!(table in exports.TYPE_HOOK)) {
+        exports.TYPE_HOOK[table] = {};
+    }
+    exports.TYPE_HOOK[table][column] = type;
+}
 function registerSerdeHooksForTable(table, map) {
     for (const [column, serde] of Object.entries(map)) {
         if (serde) {
@@ -108,3 +121,11 @@ function registerSerdeHooksForTable(table, map) {
     }
 }
 exports.registerSerdeHooksForTable = registerSerdeHooksForTable;
+function setGenerateTypes(flag) {
+    GENERATE_TYPES = flag;
+}
+exports.setGenerateTypes = setGenerateTypes;
+function registerPreamble(str) {
+    exports.PREAMBLE.push(str);
+}
+exports.registerPreamble = registerPreamble;

@@ -5,7 +5,7 @@ Copyright (C) 2020 - 2022 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generate = void 0;
+exports.generateFromConfigFile = exports.generate = void 0;
 const fs = require("fs");
 const path = require("path");
 const config_1 = require("./config");
@@ -49,3 +49,46 @@ declare module 'zapatos/custom' { }
     legacy.srcWarning(config);
 };
 exports.generate = generate;
+const recursivelyInterpolateEnvVars = (obj) => 
+// string? => do the interpolation
+typeof obj === "string"
+    ? obj.replace(/\{\{\s*([^}\s]+)\s*\}\}/g, (_0, name) => {
+        const e = process.env[name];
+        if (e === undefined)
+            throw new Error(`Environment variable '${name}' is not set`);
+        return e;
+    })
+    : // array? => recurse over its items
+        Array.isArray(obj)
+            ? obj.map((item) => recursivelyInterpolateEnvVars(item))
+            : // object? => recurse over its values (but don't touch the keys)
+                obj !== null && typeof obj === "object"
+                    ? Object.keys(obj).reduce((memo, key) => {
+                        memo[key] = recursivelyInterpolateEnvVars(obj[key]);
+                        return memo;
+                    }, {})
+                    : // anything else (e.g. number)? => pass right through
+                        obj;
+function generateFromConfigFile() {
+    var _a;
+    const configFile = "zapatosconfig.json", configJSON = fs.existsSync(configFile)
+        ? fs.readFileSync(configFile, { encoding: "utf8" })
+        : "{}", argsJSON = (_a = process.argv[2]) !== null && _a !== void 0 ? _a : "{}";
+    let fileConfig;
+    try {
+        fileConfig = recursivelyInterpolateEnvVars(JSON.parse(configJSON));
+    }
+    catch (err) {
+        throw new Error(`If present, zapatosconfig.json must be a valid JSON file, and all referenced environment variables must exist: ${err.message}`);
+    }
+    let argsConfig;
+    try {
+        argsConfig = recursivelyInterpolateEnvVars(JSON.parse(argsJSON));
+    }
+    catch (err) {
+        throw new Error(`If present, the argument to Zapatos must be valid JSON, and all referenced environment variables must exist: ${err.message}`);
+    }
+    return (0, exports.generate)({ ...fileConfig, ...argsConfig });
+}
+exports.generateFromConfigFile = generateFromConfigFile;
+;

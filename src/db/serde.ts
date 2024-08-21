@@ -17,6 +17,11 @@ export interface Hook<U, V> {
 // TODO: narrow these types
 const DESERIALIZE_HOOK: Hook<any, any> = {};
 const SERIALIZE_HOOK: Hook<any, any> = {};
+export const TYPE_HOOK: { [t: Table]: { [c: Column]: string } } = {};
+export const PREAMBLE: string[] = [];
+
+//
+var GENERATE_TYPES = false;
 
 type InsertableOrSelectableForTable<T extends Table> =
   | InsertableForTable<T>
@@ -151,12 +156,13 @@ export function registerSerializeHook<T extends Table, U>(
 export type SerdeHook<T> = {
   serialize?: (x: T) => any;
   deserialize?: (x: any) => T;
+  type?: string;
 };
 
 export function registerSerdeHook<T extends Table, U>(
   table: T,
   column: ColumnForTable<T>,
-  { serialize, deserialize }: SerdeHook<U>
+  { serialize, deserialize, type }: SerdeHook<U>
 ) {
   if (deserialize) {
     registerDeserializeHook(table, column, deserialize);
@@ -164,11 +170,21 @@ export function registerSerdeHook<T extends Table, U>(
   if (serialize) {
     registerSerializeHook(table, column, serialize);
   }
+  if (type && GENERATE_TYPES) {
+    registerTypeHook(table, column, type);
+  }
 }
 
 type SerdeTableMap<T extends Table> = Partial<
   Record<ColumnForTable<T>, SerdeHook<any>>
 >;
+
+function registerTypeHook(table: string, column: string, type: string) {
+  if (!(table in TYPE_HOOK)) {
+    TYPE_HOOK[table] = {};
+  }
+  TYPE_HOOK[table][column] = type;
+}
 
 export function registerSerdeHooksForTable<T extends Table>(
   table: T,
@@ -179,4 +195,12 @@ export function registerSerdeHooksForTable<T extends Table>(
       registerSerdeHook(table, column, serde);
     }
   }
+}
+
+export function setGenerateTypes(flag: boolean) {
+  GENERATE_TYPES = flag;
+}
+
+export function registerPreamble(str: string) {
+  PREAMBLE.push(str);
 }
