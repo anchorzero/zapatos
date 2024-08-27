@@ -15,7 +15,8 @@
     "build": "npx tsc && npx gen-esm-wrapper db db.mjs && npx gen-esm-wrapper generate generate.mjs",
     "version": "npm run lint && npm run build",
     "postversion": "git push && git push --tags && npm publish",
-    "postinstall": "node -e \"console.warn('>>> \\u001b[1;33mZapatos was installed or upgraded. Please (re-)run \\u001b[1;32mnpx zapatos\\u001b[1;33m.\\u001b[0m <<<\\u000a')\""
+    "postinstall": "node -e \"console.warn('>>> \\u001b[1;33mZapatos was installed or upgraded. Please (re-)run \\u001b[1;32mnpx zapatos\\u001b[1;33m.\\u001b[0m <<<\\u000a')\"",
+    "test": "vitest"
   },
   "files": [
     "dist/db",
@@ -53,6 +54,8 @@
     "typescript": ">=4.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.2.3",
+    "@types/json-bigint": "^1.0.1",
     "@types/pg": "^8.6.5",
     "@typescript-eslint/eslint-plugin": "^5.39.0",
     "@typescript-eslint/parser": "^5.39.0",
@@ -61,6 +64,7 @@
     "eslint-plugin-import": "^2.26.0",
     "gen-esm-wrapper": "^1.1.3",
     "pg": "^8.7.3",
-    "typescript": "^4.9.5"
+    "typescript": "^4.9.5",
+    "vitest": "^2.0.5"
   }
 }
