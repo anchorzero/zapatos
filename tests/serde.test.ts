@@ -1,14 +1,11 @@
 import { PGlite } from "@electric-sql/pglite";
 
-import {
-  insert,
-  registerSerdeHooksForTable,
-  select,
-  conditions as dc,
-} from "../src/db";
-import type { SerdeHook } from "../src/db";
-import { expect, test } from "vitest";
+import { conditions as dc } from "../src/db";
+import { beforeAll, describe, expect, test } from "vitest";
 import { PGLiteClient } from "./db";
+import { all, sql, vals } from "../src/db/core";
+import { registerSerdeHooksForTable, SerdeHook } from "../src/db/serde";
+import { insert, select } from "../src/db/shortcuts";
 
 test("can insert and select with serde", async () => {
   const db = new PGlite();
@@ -101,3 +98,168 @@ test("can use conditions with serde", async () => {
     { bar: 3, baz: "sailboat", date: date3 },
   ]);
 });
+
+describe('and/or conditions+serde', () => {
+  const db = new PGlite();
+  let client: PGLiteClient;
+
+  function nullableSerde<T>({
+    deserialize,
+    serialize,
+    type,
+  }: SerdeHook<T>): SerdeHook<T | null> {
+    return {
+      serialize: serialize
+        ? (x: T | null) => (x !== undefined && x != null ? serialize(x) : null)
+        : undefined,
+      deserialize: deserialize
+        ? (x: any) => (x !== undefined && x != null ? deserialize(x) : null)
+        : undefined,
+      type,
+    };
+  }
+
+  type ObjType1 = { idName: 'ObjType1', value: BigInt };
+  function ObjType1(value: string): ObjType1 {
+    return { idName: 'ObjType1', value: BigInt(value) }
+  }
+
+  type ObjType2 = { idName: 'ObjType2', value: BigInt };
+  function ObjType2(value: string): ObjType2 {
+    return { idName: 'ObjType2', value: BigInt(value) }
+  }
+
+  type ObjType3 = { idName: 'ObjType3', value: string };
+  function ObjType3(value: string): ObjType3 {
+    return { idName: 'ObjType3', value }
+  }
+
+  const serdeObjType1: SerdeHook<ObjType1> = {
+    serialize: (x: ObjType1) => x.value.toString(),
+    deserialize: ObjType1,
+    type: 'ObjType1',
+  };
+
+  const serdeObjType2: SerdeHook<ObjType2> = {
+    serialize: (x: ObjType2) => x.value.toString(),
+    deserialize: ObjType2,
+    type: 'ObjType2',
+  };
+  
+
+  const serdeObjType3: SerdeHook<ObjType3> = {
+    serialize: (x: ObjType3) => x.value.toString(),
+    deserialize: ObjType3,
+    type: 'ObjType3',
+  };
+
+  const objtype1s = [ObjType1('1'), ObjType1('2'), ObjType1('3')];
+  const objtype2s = [
+    ObjType2('100'),
+    ObjType2('200'),
+    ObjType2('300'),
+  ];
+  const objtype3s = [
+    ObjType3('00000000-0000-4000-a000-000000000001'),
+    ObjType3('00000000-0000-4000-a000-000000000002'),
+    ObjType3('00000000-0000-4000-a000-000000000003'),
+  ];
+  const rows = [
+    { pk: 0, obj_type_1: objtype1s[0], obj_type_2: null, obj_type_3: null },
+    { pk: 1, obj_type_1: null, obj_type_2: objtype2s[0], obj_type_3: null },
+    { pk: 2, obj_type_1: null, obj_type_2: null, obj_type_3: objtype3s[0] },
+    { pk: 3, obj_type_1: objtype1s[1], obj_type_2: objtype2s[1], obj_type_3: null },
+    { pk: 4, obj_type_1: objtype1s[2], obj_type_2: null, obj_type_3: objtype3s[1] },
+    { pk: 5, obj_type_1: null, obj_type_2: objtype2s[2], obj_type_3: objtype3s[2] },
+  ];
+
+  beforeAll(async () => {
+    await db.query('CREATE TABLE "test_conditions" (' +
+      '"pk" INTEGER NOT NULL,' +
+      '"obj_type_1" BIGINT,' +
+      '"obj_type_2" BIGINT,' +
+      '"obj_type_3" UUID,' +
+      'CONSTRAINT "test_conditions_pkey" PRIMARY KEY ("pk"));');
+    
+    registerSerdeHooksForTable('test_conditions', {
+      obj_type_1: nullableSerde(serdeObjType1),
+      obj_type_2: nullableSerde(serdeObjType2),
+      obj_type_3: nullableSerde(serdeObjType3),
+    });
+
+    client = new PGLiteClient(db);
+    await insert("test_conditions", rows).run(client);
+  });
+
+   // this is just a sanity check that everything has been set up correctly
+  test('basic filter works -- get everything', async () => {
+    const results = await select('test_conditions', all, {
+        order: { by: 'pk', direction: 'ASC' },
+      })
+      .run(client);
+    expect(results).toEqual(rows);
+  });
+
+  //another sanity check
+  test('basic filter works -- dc.isIn', async () => {
+    const results = await select(
+        'test_conditions',
+        { obj_type_1: dc.isIn(objtype1s) },
+        {
+          order: { by: 'pk', direction: 'ASC' },
+        },
+      )
+      .run(client);
+    expect(results).toEqual([rows[0], rows[3], rows[4]]);
+  });
+
+  //TODO we should ensure that this works in mainline zapatos
+  test('dc.and with dc.isTrue works', async () => {
+    const results = await select('test_conditions', dc.and({ obj_type_1: dc.isIn(objtype1s) }, dc.isTrue), {
+        order: { by: 'pk', direction: 'ASC' },
+      })
+      .run(client);
+    expect(results).toEqual([rows[0], rows[3], rows[4]]);
+  });
+
+  //TODO we should ensure that this works in mainline zapatos
+  test('dc.or with dc.isTrue works', async () => {
+    const results = await select('test_conditions', dc.and({ obj_type_1: dc.isIn(objtype1s) }, dc.isTrue), {
+        order: { by: 'pk', direction: 'ASC' },
+      })
+      .run(client);
+    expect(results).toEqual(rows);
+  });
+
+  //TODO we should ensure that this works in mainline zapatos, though per https://github.com/jawj/zapatos/issues/178,
+  //     it seems like it should
+  test('conditions can be composed', async () => {
+    const results = await select(
+        'test_conditions',
+        dc.and(
+          { obj_type_1: objtype1s },
+          dc.or({ obj_type_2: objtype2s }, { obj_type_3: objtype3s }),
+        ),
+        { order: { by: 'pk', direction: 'ASC' } },
+      )
+      .run(client);
+    expect(results).toEqual([rows[3], rows[4]]);
+  });
+
+  test('raw sql -- without isTrue works', async () => {
+    const results = await select('test_conditions', sql`${'obj_type_1'} IN (${vals(objtype1s.map((id) => id.value.toString()))})`, { order: { by: 'pk', direction: 'ASC' } }).run(client);
+    expect(results).toEqual([rows[0], rows[3], rows[4]]);
+  })
+
+  //TODO we should ensure that this works in mainline zapatos
+  test('raw sql -- dc.and with isTrue fails', async () => {
+    const results = await select('test_conditions', dc.and(sql`${'obj_type_1'} IN (${vals(objtype1s.map((id) => id.value.toString()))})`, dc.isTrue), { order: { by: 'pk', direction: 'ASC' } }).run(client);
+    expect(results).toEqual([rows[0], rows[3], rows[4]]);
+  })
+
+  //TODO we should ensure that this works in mainline zapatos
+  test('raw sql -- dc.or with isTrue fails', async () => {
+    const results = await select('test_conditions', dc.or(sql`${'obj_type_1'} IN (${vals(objtype1s.map((id) => id.value.toString()))})`, dc.isTrue), { order: { by: 'pk', direction: 'ASC' } }).run(client);
+    expect(results).toEqual(rows);
+  })
+})
