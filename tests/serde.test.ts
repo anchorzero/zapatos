@@ -393,9 +393,9 @@ describe("and/or conditions+serde", () => {
     expect(results).toEqual([rows[0]]);
   })
 
-  test("use wherable with sql using self and hook 2", async () => {
+  test("use wherable with sql using self and hook with values", async () => {
     const results = await select("test_conditions", { obj_type_1: sql`${zself} IN (${vals([1,2,3])})`}, { order: { by: "pk", direction: "ASC" } }).run(client);
-    expect(results).toEqual([rows[0]]);
+    expect(results).toEqual([rows[0], rows[3], rows[4]]);
   })
 
   test("use wherable with sql using self, hook, and conditions", async () => {
