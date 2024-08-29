@@ -14,6 +14,32 @@ function applyHook(hook, table, values, lateral) {
         ? values.map((v) => applyHookSingle(hook, table, v, lateral))
         : applyHookSingle(hook, table, values, lateral));
 }
+function applyHookSQLFragment(hook, table, v, k, lateral) {
+    for (const sql of v.getExpressions()) {
+        applyHookSQL(hook, table, sql, k);
+    }
+    return v;
+}
+function applyHookSQL(hook, table, sql, k, lateral) {
+    if (sql instanceof core_1.ColumnValues) {
+        const processedExpressionValue = Array.isArray(sql.value)
+            ? sql.value.map((x) => applyHookSingle(hook, table, { [k]: x })[k])
+            : applyHookSingle(hook, table, { [k]: sql.value })[k]; //expression.value
+        sql.value = processedExpressionValue;
+    }
+    else if (sql instanceof core_1.SQLFragment) {
+        applyHookSQLFragment(hook, table, sql, k);
+    }
+    else if (Array.isArray(sql)) {
+        sql.forEach((subSql) => {
+            applyHookSQL(hook, table, subSql, k);
+        });
+    }
+    else {
+        // record type - mapping columns to expressions
+        applyHookSingle(hook, table, sql);
+    }
+}
 function applyHookSingle(hook, table, values, lateral) {
     var _a;
     const processed = {};
@@ -23,25 +49,12 @@ function applyHookSingle(hook, table, values, lateral) {
             continue;
         }
         else if (v instanceof core_1.SQLFragment) {
-            const processedExpressions = [];
-            for (const expression of v.getExpressions()) {
-                if (expression instanceof core_1.ColumnValues) {
-                    const processedExpressionValue = Array.isArray(expression.value)
-                        ? expression.value.map((x) => applyHookSingle(hook, table, { [k]: x })[k])
-                        : applyHookSingle(hook, table, { [k]: expression.value })[k]; //expression.value
-                    expression.value = processedExpressionValue;
-                    processedExpressions.push(expression);
-                }
-                else {
-                    processedExpressions.push(expression);
-                }
-            }
-            v.setExpressions(processedExpressions);
+            applyHookSQLFragment(hook, table, v, k, lateral);
             processed[k] = v;
             continue;
         }
         const f = (_a = hook === null || hook === void 0 ? void 0 : hook[table]) === null || _a === void 0 ? void 0 : _a[k];
-        processed[k] = f ? f(v) : v;
+        processed[k] = f ? (Array.isArray(v) ? v.map(f) : f(v)) : v;
     }
     if (lateral) {
         if (lateral instanceof core_1.SQLFragment) {
@@ -61,7 +74,7 @@ function applyHookSingle(hook, table, values, lateral) {
 }
 function applyHookForWhere(table, where) {
     if (where instanceof core_1.SQLFragment) {
-        return where;
+        return applyHookSQLFragment(SERIALIZE_HOOK, table, where, "sentinel");
     }
     else {
         return applySerializeHook(table, where);

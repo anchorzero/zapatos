@@ -303,4 +303,60 @@ describe("and/or conditions+serde", () => {
     ).run(client);
     expect(results).toEqual(rows);
   });
+
+  test("raw sql -- a raw sql TRUE", async () => {
+    const results = await select("test_conditions", sql`TRUE`, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  })
+
+  test("raw sql -- a raw sql TRUE with an and", async () => {
+    const results = await select("test_conditions", dc.or({ object_type_1: dc.isIn(objtype1s) }, sql`TRUE`), { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  })
+
+  test("mixing nested sql and conditions works -- basic", async () => {
+    const or =
+      dc.or(dc.or(
+        sql`${"obj_type_1"} IN (${vals(
+          objtype1s.map((id) => id.value.toString())
+        )})`,
+        { obj_type_1: dc.isNotIn(objtype1s) }
+      ), { obj_type_1: dc.isNull });
+    const results = await select("test_conditions", or, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  });
+
+  const baseOr = dc.or(
+    dc.or(
+      sql`${"obj_type_1"} IN (${vals(
+        objtype1s.map((id) => id.value.toString())
+      )})`,
+      { obj_type_1: dc.isNotIn(objtype1s) },
+      dc.or(
+        sql`${"obj_type_3"} IN (${vals(
+          objtype3s.map((id) => id.value.toString())
+        )})`,
+        { obj_type_3: dc.isNotIn(objtype3s) }
+      )
+    ),
+    dc.or(
+      sql`${"obj_type_2"} IN (${vals(
+        objtype2s.map((id) => id.value.toString())
+      )})`,
+      { obj_type_2: dc.isNotIn(objtype2s) }
+    )
+  );
+
+  test("mixing nested sql and conditions works -- more complex", async () => {
+    const results = await select("test_conditions", baseOr, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  });
+
+  test("mixing nested sql and conditions works -- very nested", async () => {
+    const nestedOr = dc.or(dc.and(baseOr, baseOr, sql`TRUE`), sql`FALSE`, dc.and(baseOr, baseOr, sql`TRUE`));
+    const results = await select("test_conditions", nestedOr, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  });
+
+  //TEST another one for the array
 });
