@@ -64,19 +64,17 @@ function applyHookSQLFragment<T extends Table, U, W>(
 function applyHookSQL<T extends Table, U, W>(
   hook: Hook<U, W>,
   table: T,
-  expression: SQL,
+  sql: SQL,
   k: string,
   lateral?: FullLateralOption
 ): void {
-  if (expression instanceof ColumnValues) {
-    const processedExpressionValue = Array.isArray(expression.value)
-      ? expression.value.map(
-          (x: any) => applyHookSingle(hook, table, { [k]: x })[k]
-        )
-      : applyHookSingle(hook, table, { [k]: expression.value })[k]; //expression.value
-    expression.value = processedExpressionValue;
-  } else if (Array.isArray(expression)) {
-    expression.forEach((x) => {
+  if (sql instanceof ColumnValues) {
+    const processedExpressionValue = Array.isArray(sql.value)
+      ? sql.value.map((x: any) => applyHookSingle(hook, table, { [k]: x })[k])
+      : applyHookSingle(hook, table, { [k]: sql.value })[k]; //expression.value
+    sql.value = processedExpressionValue;
+  } else if (Array.isArray(sql)) {
+    sql.forEach((x) => {
       if (x instanceof SQLFragment) {
         //applyHookSQLFragment(hook, table, x, k);
       } else {
