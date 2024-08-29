@@ -45,6 +45,43 @@ function applyHook<
   ) as V;
 }
 
+function applyHookSQLFragment<T extends Table, U, W>(
+  hook: Hook<U, W>,
+  table: T,
+  v: SQLFragment<any, any>,
+  k: string,
+  lateral?: FullLateralOption
+): SQLFragment<any, any> {
+  for (const sql of v.getExpressions()) {
+    applyHookSQL(hook, table, sql, k);
+  }
+  return v;
+}
+
+function applyHookSQL<T extends Table, U, W>(
+  hook: Hook<U, W>,
+  table: T,
+  sql: SQL,
+  k: string,
+  lateral?: FullLateralOption
+): void {
+  if (sql instanceof ColumnValues) {
+    const processedExpressionValue = Array.isArray(sql.value)
+      ? sql.value.map((x: any) => applyHookSingle(hook, table, { [k]: x })[k])
+      : applyHookSingle(hook, table, { [k]: sql.value })[k]; //expression.value
+    sql.value = processedExpressionValue;
+  } else if (sql instanceof SQLFragment) {
+    applyHookSQLFragment(hook, table, sql, k);
+  } else if (Array.isArray(sql)) {
+    sql.forEach((subSql) => {
+      applyHookSQL(hook, table, subSql, k);
+    });
+  } else {
+    // record type - mapping columns to expressions
+    applyHookSingle(hook, table, sql as any);
+  }
+}
+
 function applyHookSingle<
   T extends Table,
   V extends InsertableOrSelectableForTable<T>,
@@ -57,26 +94,12 @@ function applyHookSingle<
       processed[k as T] = v as any;
       continue;
     } else if (v instanceof SQLFragment) {
-      const processedExpressions: SQL[] = [];
-      for (const expression of v.getExpressions()) {
-        if (expression instanceof ColumnValues) {
-          const processedExpressionValue = Array.isArray(expression.value)
-            ? expression.value.map(
-                (x: any) => applyHookSingle(hook, table, { [k]: x })[k]
-              )
-            : applyHookSingle(hook, table, { [k]: expression.value })[k]; //expression.value
-          expression.value = processedExpressionValue;
-          processedExpressions.push(expression);
-        } else {
-          processedExpressions.push(expression);
-        }
-      }
-      v.setExpressions(processedExpressions);
+      applyHookSQLFragment(hook, table, v, k, lateral);
       processed[k as T] = v as any;
       continue;
     }
     const f = hook?.[table]?.[k];
-    processed[k as T] = f ? f(v) : v;
+    processed[k as T] = f ? (Array.isArray(v) ? v.map(f) : f(v)) : v;
   }
   if (lateral) {
     if (lateral instanceof SQLFragment) {
@@ -99,7 +122,7 @@ export function applyHookForWhere<T extends Table, U, W>(
   where: Whereable
 ) {
   if (where instanceof SQLFragment) {
-    return where;
+    return applyHookSQLFragment(SERIALIZE_HOOK, table, where, "sentinel");
   } else {
     return applySerializeHook(table, where);
   }
