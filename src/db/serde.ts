@@ -52,12 +52,9 @@ function applyHookSQLFragment<T extends Table, U, W>(
   k: string,
   lateral?: FullLateralOption
 ): SQLFragment<any, any> {
-  const processedExpressions: SQL[] = [];
-  for (const expression of v.getExpressions()) {
-    applyHookSQL(hook, table, expression, k);
-    processedExpressions.push(expression);
+  for (const sql of v.getExpressions()) {
+    applyHookSQL(hook, table, sql, k);
   }
-  v.setExpressions(processedExpressions);
   return v;
 }
 
@@ -73,16 +70,15 @@ function applyHookSQL<T extends Table, U, W>(
       ? sql.value.map((x: any) => applyHookSingle(hook, table, { [k]: x })[k])
       : applyHookSingle(hook, table, { [k]: sql.value })[k]; //expression.value
     sql.value = processedExpressionValue;
+  } else if (sql instanceof SQLFragment) {
+    applyHookSQLFragment(hook, table, sql, k);
   } else if (Array.isArray(sql)) {
-    sql.forEach((x) => {
-      if (x instanceof SQLFragment) {
-        //applyHookSQLFragment(hook, table, x, k);
-      } else {
-        // this applies to a Record type
-        applyHookSingle(hook, table, x);
-      }
+    sql.forEach((subSql) => {
+      applyHookSQL(hook, table, subSql, k);
     });
   } else {
+    // record type - mapping columns to expressions
+    applyHookSingle(hook, table, sql as any);
   }
 }
 
@@ -103,7 +99,7 @@ function applyHookSingle<
       continue;
     }
     const f = hook?.[table]?.[k];
-    processed[k as T] = f ? f(v) : v;
+    processed[k as T] = f ? (Array.isArray(v) ? v.map(f) : f(v)) : v;
   }
   if (lateral) {
     if (lateral instanceof SQLFragment) {

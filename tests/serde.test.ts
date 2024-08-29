@@ -247,32 +247,22 @@ describe("and/or conditions+serde", () => {
         order: { by: "pk", direction: "ASC" },
       }
     ).run(client);
-    console.log(results, rows);
     expect(results).toEqual(rows);
   });
 
-  //TODO we should ensure that this works in mainline zapatos, though per https://github.com/jawj/zapatos/issues/178,
-  //     it seems like it should
   test("conditions can be composed", async () => {
-    console.log(
-      applyHookForWhere(
-        "test_conditions",
-        dc.and(
-          { obj_type_1: objtype1s },
-          dc.or({ obj_type_2: objtype2s }, { obj_type_3: objtype3s })
-        )
-      ).compile()
-    );
-
-    /* const results = await select(
+    const results = await select(
       "test_conditions",
       dc.and(
-        { obj_type_1: objtype1s },
-        dc.or({ obj_type_2: objtype2s }, { obj_type_3: objtype3s })
+        { obj_type_1: dc.isIn(objtype1s) },
+        dc.or(
+          { obj_type_2: dc.isIn(objtype2s) },
+          { obj_type_3: dc.isIn(objtype3s) }
+        )
       ),
       { order: { by: "pk", direction: "ASC" } }
     ).run(client);
-    expect(results).toEqual([rows[3], rows[4]]); */
+    expect(results).toEqual([rows[3], rows[4]]);
   });
 
   test("raw sql -- without isTrue works", async () => {
