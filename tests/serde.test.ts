@@ -3,7 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { conditions as dc } from "../src/db";
 import { beforeAll, describe, expect, test } from "vitest";
 import { PGLiteClient } from "./db";
-import { all, sql, vals } from "../src/db/core";
+import { all, sql, vals, self as zself } from "../src/db/core";
 import {
   applyHookForWhere,
   registerSerdeHooksForTable,
@@ -187,6 +187,18 @@ describe("and/or conditions+serde", () => {
     },
   ];
 
+  const rows2 = [
+    { pk: 0, plain: [] },
+    { pk: 1, plain: [1] },
+    { pk: 2, plain: [1, 1] },
+    { pk: 3, plain: [1, 1, 2] },
+    { pk: 4, plain: [1, 1, 2, 3] },
+    { pk: 5, plain: [1, 1, 2, 3, 5] },
+    { pk: 6, plain: [1, 1, 2, 3, 5, 8] },
+    { pk: 7, plain: [1, 1, 2, 3, 5, 8, 13] },
+    { pk: 8, plain: [1, 1, 2, 3, 5, 8, 13, 21] },
+  ]
+
   beforeAll(async () => {
     await db.query(
       'CREATE TABLE "test_conditions" (' +
@@ -197,6 +209,17 @@ describe("and/or conditions+serde", () => {
         'CONSTRAINT "test_conditions_pkey" PRIMARY KEY ("pk"));'
     );
 
+    await db.query(
+      'CREATE TABLE "test_conditions_array" (' +
+        '"pk" INTEGER NOT NULL,' +
+        '"plain" INT array,' +
+        // I don't know if the normal serde hook will even work with this
+        //TODO once we verify the plain field works with sunil's addition,
+        //     can choose if we want to add tests for serde hook with this array
+        //'"obj_type_1" BIGINT array,' +
+        'CONSTRAINT "test_conditions_array_pkey" PRIMARY KEY ("pk"));'
+    );
+
     registerSerdeHooksForTable("test_conditions", {
       obj_type_1: nullableSerde(serdeObjType1),
       obj_type_2: nullableSerde(serdeObjType2),
@@ -205,6 +228,8 @@ describe("and/or conditions+serde", () => {
 
     client = new PGLiteClient(db);
     await insert("test_conditions", rows).run(client);
+    //TODO maybe we should split this out into a separate describe
+    await insert("test_conditions_array", rows2).run(client);
   });
 
   // this is just a sanity check that everything has been set up correctly
@@ -303,4 +328,106 @@ describe("and/or conditions+serde", () => {
     ).run(client);
     expect(results).toEqual(rows);
   });
+
+  test("raw sql -- a raw sql TRUE", async () => {
+    const results = await select("test_conditions", sql`TRUE`, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  })
+
+  test("raw sql -- a raw sql TRUE with an and", async () => {
+    const results = await select("test_conditions", dc.or({ object_type_1: dc.isIn(objtype1s) }, sql`TRUE`), { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  })
+
+  test("mixing nested sql and conditions works -- basic", async () => {
+    const or =
+      dc.or(dc.or(
+        sql`${"obj_type_1"} IN (${vals(
+          objtype1s.map((id) => id.value.toString())
+        )})`,
+        { obj_type_1: dc.isNotIn(objtype1s) }
+      ), { obj_type_1: dc.isNull });
+    const results = await select("test_conditions", or, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  });
+
+  const baseOr = dc.or(
+    dc.or(
+      sql`${"obj_type_1"} IN (${vals(
+        objtype1s.map((id) => id.value.toString())
+      )})`,
+      { obj_type_1: dc.isNotIn(objtype1s) },
+      dc.or(
+        sql`${"obj_type_3"} IN (${vals(
+          objtype3s.map((id) => id.value.toString())
+        )})`,
+        { obj_type_3: dc.isNotIn(objtype3s) }
+      )
+    ),
+    dc.or(
+      sql`${"obj_type_2"} IN (${vals(
+        objtype2s.map((id) => id.value.toString())
+      )})`,
+      { obj_type_2: dc.isNotIn(objtype2s) }
+    )
+  );
+
+  test("mixing nested sql and conditions works -- more complex", async () => {
+    const results = await select("test_conditions", baseOr, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  });
+
+  test("mixing nested sql and conditions works -- very nested", async () => {
+    const nestedOr = dc.or(dc.and(baseOr, baseOr, sql`TRUE`), sql`FALSE`, dc.and(baseOr, baseOr, sql`TRUE`));
+    const results = await select("test_conditions", nestedOr, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows);
+  });
+
+  test("wherable with no hook and sql using self", async () => {
+    const results = await select("test_conditions", { pk: sql`${zself} = 1`}, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual([rows[1]]);
+  })
+
+  test("use wherable with sql using self and hook", async () => {
+    const results = await select("test_conditions", { obj_type_1: sql`${zself} = 1`}, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual([rows[0]]);
+  })
+
+  test("use wherable with sql using self and hook with values", async () => {
+    const results = await select("test_conditions", { obj_type_1: sql`${zself} IN (${vals([1,2,3])})`}, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual([rows[0], rows[3], rows[4]]);
+  })
+
+  test("use wherable with sql using self, hook, and conditions", async () => {
+    const results = await select("test_conditions", dc.and({ obj_type_1: dc.isIn(objtype1s) }, { obj_type_2: sql`${zself} = 100`}), { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows[3]);
+  })
+
+  test("conditions with an array field -- basic sql true", async () => {
+    const results = await select("test_conditions_array", sql`TRUE`, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows2);
+  });
+
+  test("conditions with an array field -- basic condition", async () => {
+    const results = await select("test_conditions_array", { pk: dc.between(3, 5) }, { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows2.slice(3, 6));
+  });
+
+  test("conditions with an array field -- basic condition with and", async () => {
+    const results = await select("test_conditions_array", dc.and({ pk: dc.between(2, 6) }, { pk: dc.between(1, 5) }), { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows2.slice(2, 6));
+  });
+
+  test("conditions with an array field -- basic condition with array field", async () => {
+    const results = await select("test_conditions_array", dc.and({ pk: dc.between(2, 6) }, { plain: dc.isNotNull }), { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual(rows2.slice(2, 7));
+  });
+
+  test("conditions with an array field -- basic condition with array field condition", async () => {
+    const results = await select("test_conditions_array", dc.and({ pk: dc.between(2, 7) }, { plain: dc.isIn([[], [1, 1, 2], [1, 1, 2, 3, 5]]) }), { order: { by: "pk", direction: "ASC" } }).run(client);
+    expect(results).toEqual([rows2[3], rows2[5]]);
+  });
+
+  //TODO spend a bit more time with sunil's hook and try and invoke the Array.isArray path that
+  //     there was some worry about
 });
