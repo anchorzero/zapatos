@@ -284,7 +284,7 @@ class SQLFragment {
                 }
                 else if (typeof expression.cast === 'string') {
                     result.values.push(expression.value);
-                    result.text += `CAST(${placeholder} AS "${expression.cast}")`;
+                    result.text += `CAST(${placeholder} AS ${expression.cast})`;
                 }
                 else {
                     result.values.push(expression.value);
