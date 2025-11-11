@@ -113,7 +113,7 @@ interface TruncateSignatures {
  * 'RESTRICT'/'CASCADE'
  */
 export declare const truncate: TruncateSignatures;
-interface OrderSpecForTable<T extends Table> {
+export interface OrderSpecForTable<T extends Table> {
     by: SQLForTable<T>;
     direction: 'ASC' | 'DESC';
     nulls?: 'FIRST' | 'LAST';

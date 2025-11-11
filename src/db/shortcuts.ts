@@ -392,7 +392,7 @@ export const truncate: TruncateSignatures = function (
 
 /* === select === */
 
-interface OrderSpecForTable<T extends Table> {
+export interface OrderSpecForTable<T extends Table> {
   by: SQLForTable<T>;
   direction: 'ASC' | 'DESC';
   nulls?: 'FIRST' | 'LAST';
