@@ -1,5 +1,5 @@
 import type { JSONSelectableForTable, WhereableForTable, InsertableForTable, UpdatableForTable, ColumnForTable, UniqueIndexForTable, SQLForTable, Table } from 'zapatos/schema';
-import { AllType, all, SQLFragment } from './core';
+import { AllType, all, SQLFragment, SelectResultMode } from './core';
 import { NoInfer } from './utils';
 export type JSONOnlyColsForTable<T extends Table, C extends any[]> = Pick<JSONSelectableForTable<T>, C[number]>;
 export interface SQLFragmentMap {
@@ -139,12 +139,6 @@ export interface SelectOptionsForTable<T extends Table, C extends ColumnsOption<
     lock?: SelectLockingOptions<NoInfer<A>> | SelectLockingOptions<NoInfer<A>>[];
 }
 type SelectReturnTypeForTable<T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>> = (undefined extends L ? ReturningTypeForTable<T, C, E> : L extends SQLFragmentMap ? ReturningTypeForTable<T, C, E> & LateralResult<L> : L extends SQLFragment<any> ? RunResultForSQLFragment<L> : never);
-export declare enum SelectResultMode {
-    Many = 0,
-    One = 1,
-    ExactlyOne = 2,
-    Numeric = 3
-}
 export type FullSelectReturnTypeForTable<T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, M extends SelectResultMode> = {
     [SelectResultMode.Many]: SelectReturnTypeForTable<T, C, L, E>[];
     [SelectResultMode.ExactlyOne]: SelectReturnTypeForTable<T, C, L, E>;
@@ -153,10 +147,6 @@ export type FullSelectReturnTypeForTable<T extends Table, C extends ColumnsOptio
 }[M];
 export interface SelectSignatures {
     <T extends Table, C extends ColumnsOption<T>, L extends LateralOption<C, E>, E extends ExtrasOption<T>, A extends string = never, M extends SelectResultMode = SelectResultMode.Many>(table: T, where: WhereableForTable<T> | SQLFragment<any> | AllType, options?: SelectOptionsForTable<T, C, L, E, A>, mode?: M, aggregate?: string): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, M>>;
-}
-export declare class NotExactlyOneError extends Error {
-    query: SQLFragment;
-    constructor(query: SQLFragment, ...params: any[]);
 }
 /**
  * Generate a `SELECT` query `SQLFragment`. This can be nested with other

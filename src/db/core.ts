@@ -225,6 +225,27 @@ export function sql<
 
 let preparedNameSeq = 0;
 
+/**
+ * The result cardinality a `select` shortcut was built for.
+ *
+ * Lives here rather than in shortcuts.ts (where it is used) because serde.ts
+ * needs it at runtime to enforce `ExactlyOne` inside laterals, and shortcuts.ts
+ * already imports serde.ts — putting it there would close a require cycle.
+ * core.ts imports neither, so it is the natural floor for both.
+ */
+export enum SelectResultMode { Many, One, ExactlyOne, Numeric }
+
+export class NotExactlyOneError extends Error {
+  // see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error
+  query: SQLFragment;
+  constructor(query: SQLFragment, ...params: any[]) {
+    super(...params);
+    if (Error.captureStackTrace) Error.captureStackTrace(this, NotExactlyOneError);  // V8 only
+    this.name = 'NotExactlyOneError';
+    this.query = query;  // custom property
+  }
+}
+
 export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
   protected constraint?: Constraint;
 
@@ -238,6 +259,15 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
 
   parentTable?: string = undefined;  // used for nested shortcut select queries
   preparedName?: string = undefined;  // for prepared statements
+
+  /**
+   * Which `select` shortcut produced this fragment, if any. Set by `select()`.
+   *
+   * A lateral sub-query is never `.run()`, so its `runResultTransform` — and the
+   * `ExactlyOne` check inside it — is dead code. Recording the mode on the
+   * fragment is what lets the deserialize walk in serde.ts enforce it instead.
+   */
+  selectResultMode?: SelectResultMode = undefined;
 
   noop = false;  // if true, bypass actually running the query unless forced to e.g. for empty INSERTs
   noopResult: any;  // if noop is true and DB is bypassed, what should be returned?
@@ -262,6 +292,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     preparedName?: string;
     noop?: boolean;
     noopResult?: any;
+    selectResultMode?: SelectResultMode;
   }): SQLFragment<RunResult, Constraint> {
     const { literals = this.literals, expressions = this.expressions, ...overrideRest } = override ?? {};
     const copy = new SQLFragment<RunResult, Constraint>(literals, expressions);
@@ -269,7 +300,8 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       parentTable: this.parentTable,
       preparedName: this.preparedName,
       noop: this.noop,
-      noopResult: this.noopResult
+      noopResult: this.noopResult,
+      selectResultMode: this.selectResultMode
     }, overrideRest);
   }
 

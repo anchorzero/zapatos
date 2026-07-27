@@ -13,6 +13,7 @@
   "scripts": {
     "lint": "eslint src/db/*.ts src/generate/*.ts",
     "build": "npx tsc && npx gen-esm-wrapper db db.mjs && npx gen-esm-wrapper generate generate.mjs",
+    "test": "node test/lateral-exactly-one.js",
     "version": "npm run lint && npm run build",
     "postversion": "git push && git push --tags && npm publish",
     "postinstall": "node -e \"console.warn('>>> \\u001b[1;33mZapatos was installed or upgraded. Please (re-)run \\u001b[1;32mnpx zapatos\\u001b[1;33m.\\u001b[0m <<<\\u000a')\""

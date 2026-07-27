@@ -5,7 +5,7 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.max = exports.min = exports.avg = exports.sum = exports.count = exports.selectExactlyOne = exports.selectOne = exports.select = exports.NotExactlyOneError = exports.SelectResultMode = exports.truncate = exports.deletes = exports.update = exports.upsert = exports.doNothing = exports.Constraint = exports.insert = void 0;
+exports.max = exports.min = exports.avg = exports.sum = exports.count = exports.selectExactlyOne = exports.selectOne = exports.select = exports.truncate = exports.deletes = exports.update = exports.upsert = exports.doNothing = exports.Constraint = exports.insert = void 0;
 exports.constraint = constraint;
 const core_1 = require("./core");
 const serde_1 = require("./serde");
@@ -138,23 +138,6 @@ const truncate = function (table, ...opts) {
 };
 exports.truncate = truncate;
 ;
-var SelectResultMode;
-(function (SelectResultMode) {
-    SelectResultMode[SelectResultMode["Many"] = 0] = "Many";
-    SelectResultMode[SelectResultMode["One"] = 1] = "One";
-    SelectResultMode[SelectResultMode["ExactlyOne"] = 2] = "ExactlyOne";
-    SelectResultMode[SelectResultMode["Numeric"] = 3] = "Numeric";
-})(SelectResultMode || (exports.SelectResultMode = SelectResultMode = {}));
-class NotExactlyOneError extends Error {
-    constructor(query, ...params) {
-        super(...params);
-        if (Error.captureStackTrace)
-            Error.captureStackTrace(this, NotExactlyOneError); // V8 only
-        this.name = 'NotExactlyOneError';
-        this.query = query; // custom property
-    }
-}
-exports.NotExactlyOneError = NotExactlyOneError;
 /**
  * Generate a `SELECT` query `SQLFragment`. This can be nested with other
  * `select`/`selectOne`/`count` queries using the `lateral` option.
@@ -176,12 +159,12 @@ exports.NotExactlyOneError = NotExactlyOneError;
  * quantities can be included in the JSON result
  * @param mode (Used internally by `selectOne` and `count`)
  */
-const select = function (table, where = core_1.all, options = {}, mode = SelectResultMode.Many, aggregate = 'count') {
-    const limit1 = mode === SelectResultMode.One || mode === SelectResultMode.ExactlyOne, allOptions = limit1 ? { ...options, limit: 1 } : options, alias = allOptions.alias || table, { distinct, groupBy, having, lateral, columns, extras } = allOptions, lock = allOptions.lock === undefined || Array.isArray(allOptions.lock) ? allOptions.lock : [allOptions.lock], order = allOptions.order === undefined || Array.isArray(allOptions.order) ? allOptions.order : [allOptions.order], tableAliasSQL = alias === table ? [] : (0, core_1.sql) ` AS ${alias}`, distinctSQL = !distinct ? [] : (0, core_1.sql) ` DISTINCT${distinct instanceof core_1.SQLFragment || typeof distinct === 'string' ? (0, core_1.sql) ` ON (${distinct})` :
+const select = function (table, where = core_1.all, options = {}, mode = core_1.SelectResultMode.Many, aggregate = 'count') {
+    const limit1 = mode === core_1.SelectResultMode.One || mode === core_1.SelectResultMode.ExactlyOne, allOptions = limit1 ? { ...options, limit: 1 } : options, alias = allOptions.alias || table, { distinct, groupBy, having, lateral, columns, extras } = allOptions, lock = allOptions.lock === undefined || Array.isArray(allOptions.lock) ? allOptions.lock : [allOptions.lock], order = allOptions.order === undefined || Array.isArray(allOptions.order) ? allOptions.order : [allOptions.order], tableAliasSQL = alias === table ? [] : (0, core_1.sql) ` AS ${alias}`, distinctSQL = !distinct ? [] : (0, core_1.sql) ` DISTINCT${distinct instanceof core_1.SQLFragment || typeof distinct === 'string' ? (0, core_1.sql) ` ON (${distinct})` :
         Array.isArray(distinct) ? (0, core_1.sql) ` ON (${(0, core_1.cols)(distinct)})` : []}`, colsSQL = lateral instanceof core_1.SQLFragment ? [] :
-        mode === SelectResultMode.Numeric ?
+        mode === core_1.SelectResultMode.Numeric ?
             (columns ? (0, core_1.sql) `${(0, core_1.raw)(aggregate)}(${(0, core_1.cols)(columns)})` : (0, core_1.sql) `${(0, core_1.raw)(aggregate)}(*)`) :
-            SQLForColumnsOfTable(columns, alias), colsExtraSQL = lateral instanceof core_1.SQLFragment || mode === SelectResultMode.Numeric ? [] : SQLForExtras(extras), colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric ? [] :
+            SQLForColumnsOfTable(columns, alias), colsExtraSQL = lateral instanceof core_1.SQLFragment || mode === core_1.SelectResultMode.Numeric ? [] : SQLForExtras(extras), colsLateralSQL = lateral === undefined || mode === core_1.SelectResultMode.Numeric ? [] :
         lateral instanceof core_1.SQLFragment ? (0, core_1.sql) `"lateral_passthru".result` :
             (0, core_1.sql) ` || jsonb_build_object(${(0, utils_1.mapWithSeparator)(Object.keys(lateral).sort(), (0, core_1.sql) `, `, k => (0, core_1.sql) `${(0, core_1.param)(k)}::text, "lateral_${(0, core_1.raw)(k)}".result`)})`, allColsSQL = (0, core_1.sql) `${colsSQL}${colsExtraSQL}${colsLateralSQL}`, whereSQL = where === core_1.all ? [] : (0, core_1.sql) ` WHERE ${(0, serde_1.applyHookForWhere)(table, where)}`, 
     //whereSQL = where === all ? [] : sql` WHERE ${where}`,
@@ -208,24 +191,57 @@ const select = function (table, where = core_1.all, options = {}, mode = SelectR
                 const subQ = lateral[k].copy({ parentTable: alias });
                 return (0, core_1.sql) ` LEFT JOIN LATERAL (${subQ}) AS "lateral_${(0, core_1.raw)(k)}" ON true`;
             });
-    const rowsQuery = (0, core_1.sql) `SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL}${offsetSQL}${lockSQL}`, query = mode !== SelectResultMode.Many ? rowsQuery :
+    const rowsQuery = (0, core_1.sql) `SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL}${offsetSQL}${lockSQL}`, query = mode !== core_1.SelectResultMode.Many ? rowsQuery :
         // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
         (0, core_1.sql) `SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${(0, core_1.raw)(`"sq_${alias}"`)}`;
+    // Recorded so that serde.ts can enforce ExactlyOne when this fragment is used
+    // as a lateral. The runResultTransform below only fires for an outermost query;
+    // a lateral sub-query is interpolated into its parent's SQL and never `.run()`.
+    query.selectResultMode = mode;
+    // A *passthru* lateral (`lateral: someQuery`) replaces the parent's result column
+    // outright — the SQL is `SELECT "lateral_passthru".result`, not `to_jsonb(parent.*)`.
+    // So a null result unambiguously means the lateral matched nothing: `to_jsonb(t.*)`
+    // is never null for a row that exists. Zero rows means the *parent* didn't match,
+    // which selectOne may legitimately return. Only `qr` tells those apart — one frame
+    // later applyDeserializeHook sees both as a falsy `values` — so the check lives here
+    // rather than in the serde walk, where the keyed form is enforced.
+    //
+    // Deliberately NOT enforceable: a passthru nested inside a *keyed* lateral. There
+    // the parent's column is the inner query's result column, so null means either
+    // "inner parent missing" (legal) or "innermost lateral missing" (a violation), and
+    // nothing in the result set separates them.
+    const assertPassthruPresent = (result) => {
+        if (!(lateral instanceof core_1.SQLFragment) || lateral.selectResultMode !== core_1.SelectResultMode.ExactlyOne)
+            return;
+        // Many aggregates the rows, so a miss is a null *element*, not a null result.
+        const missing = mode === core_1.SelectResultMode.Many ?
+            Array.isArray(result) && result.some((r) => r === null) :
+            result === null;
+        if (missing)
+            throw new core_1.NotExactlyOneError(query, `One result expected for passthru lateral on '${alias}' but none returned ` +
+                '(hint: check `.query.compile()` on this Error)');
+    };
     query.runResultTransform =
-        mode === SelectResultMode.Numeric ?
+        mode === core_1.SelectResultMode.Numeric ?
             // note: pg deliberately returns strings for int8 in case 64-bit numbers overflow
             // (see https://github.com/brianc/node-pg-types#use), but we assume our counts aren't that big
             (qr) => Number(qr.rows[0].result) :
-            mode === SelectResultMode.ExactlyOne ?
+            mode === core_1.SelectResultMode.ExactlyOne ?
                 (qr) => {
                     var _a;
                     const result = (_a = qr.rows[0]) === null || _a === void 0 ? void 0 : _a.result;
                     if (result === undefined)
-                        throw new NotExactlyOneError(query, 'One result expected but none returned (hint: check `.query.compile()` on this Error)');
+                        throw new core_1.NotExactlyOneError(query, 'One result expected but none returned (hint: check `.query.compile()` on this Error)');
+                    assertPassthruPresent(result);
                     return (0, serde_1.applyDeserializeHook)(table, result, lateral);
                 } :
                 // SelectResultMode.One or SelectResultMode.Many
-                (qr) => { var _a; return (0, serde_1.applyDeserializeHook)(table, (_a = qr.rows[0]) === null || _a === void 0 ? void 0 : _a.result, lateral); };
+                (qr) => {
+                    var _a;
+                    const result = (_a = qr.rows[0]) === null || _a === void 0 ? void 0 : _a.result;
+                    assertPassthruPresent(result);
+                    return (0, serde_1.applyDeserializeHook)(table, result, lateral);
+                };
     return query;
 };
 exports.select = select;
@@ -245,7 +261,7 @@ const selectOne = function (table, where, options = {}) {
     // is '| undefined' in the return signature, because the result of indexing 
     // never includes undefined (until 4.1 and --noUncheckedIndexedAccess)
     // (see https://github.com/Microsoft/TypeScript/issues/13778)
-    return (0, exports.select)(table, where, options, SelectResultMode.One);
+    return (0, exports.select)(table, where, options, core_1.SelectResultMode.One);
 };
 exports.selectOne = selectOne;
 /**
@@ -259,7 +275,7 @@ exports.selectOne = selectOne;
  * @param options Options object. See documentation for `select` for details.
  */
 const selectExactlyOne = function (table, where, options = {}) {
-    return (0, exports.select)(table, where, options, SelectResultMode.ExactlyOne);
+    return (0, exports.select)(table, where, options, core_1.SelectResultMode.ExactlyOne);
 };
 exports.selectExactlyOne = selectExactlyOne;
 /**
@@ -271,7 +287,7 @@ exports.selectExactlyOne = selectExactlyOne;
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  */
 const count = function (table, where, options) {
-    return (0, exports.select)(table, where, options, SelectResultMode.Numeric);
+    return (0, exports.select)(table, where, options, core_1.SelectResultMode.Numeric);
 };
 exports.count = count;
 /**
@@ -283,7 +299,7 @@ exports.count = count;
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  */
 const sum = function (table, where, options) {
-    return (0, exports.select)(table, where, options, SelectResultMode.Numeric, 'sum');
+    return (0, exports.select)(table, where, options, core_1.SelectResultMode.Numeric, 'sum');
 };
 exports.sum = sum;
 /**
@@ -296,7 +312,7 @@ exports.sum = sum;
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  */
 const avg = function (table, where, options) {
-    return (0, exports.select)(table, where, options, SelectResultMode.Numeric, 'avg');
+    return (0, exports.select)(table, where, options, core_1.SelectResultMode.Numeric, 'avg');
 };
 exports.avg = avg;
 /**
@@ -309,7 +325,7 @@ exports.avg = avg;
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  */
 const min = function (table, where, options) {
-    return (0, exports.select)(table, where, options, SelectResultMode.Numeric, 'min');
+    return (0, exports.select)(table, where, options, core_1.SelectResultMode.Numeric, 'min');
 };
 exports.min = min;
 /**
@@ -322,6 +338,6 @@ exports.min = min;
  * @param options Options object. Useful keys may be: `columns`, `alias`.
  */
 const max = function (table, where, options) {
-    return (0, exports.select)(table, where, options, SelectResultMode.Numeric, 'max');
+    return (0, exports.select)(table, where, options, core_1.SelectResultMode.Numeric, 'max');
 };
 exports.max = max;

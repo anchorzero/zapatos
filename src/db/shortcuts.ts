@@ -30,6 +30,8 @@ import {
   raw,
   param,
   Default,
+  SelectResultMode,
+  NotExactlyOneError,
 } from './core';
 
 import {
@@ -440,7 +442,11 @@ type SelectReturnTypeForTable<
     L extends SQLFragment<any> ? RunResultForSQLFragment<L> :
     never);
 
-export enum SelectResultMode { Many, One, ExactlyOne, Numeric }
+// SelectResultMode and NotExactlyOneError now live in core.ts, so that serde.ts
+// can reach them without closing a require cycle (shortcuts.ts -> serde.ts ->
+// shortcuts.ts). They are still re-exported to consumers via index.ts's
+// `export * from './core'`, so `db.SelectResultMode` / `db.NotExactlyOneError`
+// are unchanged.
 
 export type FullSelectReturnTypeForTable<
   T extends Table,
@@ -470,17 +476,6 @@ export interface SelectSignatures {
     mode?: M,
     aggregate?: string,
   ): SQLFragment<FullSelectReturnTypeForTable<T, C, L, E, M>>;
-}
-
-export class NotExactlyOneError extends Error {
-  // see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error
-  query: SQLFragment;
-  constructor(query: SQLFragment, ...params: any[]) {
-    super(...params);
-    if (Error.captureStackTrace) Error.captureStackTrace(this, NotExactlyOneError);  // V8 only
-    this.name = 'NotExactlyOneError';
-    this.query = query;  // custom property
-  }
 }
 
 /**
@@ -568,6 +563,34 @@ export const select: SelectSignatures = function (
       // we need the aggregate to sit in a sub-SELECT in order to keep ORDER and LIMIT working as usual
       sql<SQL, any>`SELECT coalesce(jsonb_agg(result), '[]') AS result FROM (${rowsQuery}) AS ${raw(`"sq_${alias}"`)}`;
 
+  // Recorded so that serde.ts can enforce ExactlyOne when this fragment is used
+  // as a lateral. The runResultTransform below only fires for an outermost query;
+  // a lateral sub-query is interpolated into its parent's SQL and never `.run()`.
+  query.selectResultMode = mode;
+
+  // A *passthru* lateral (`lateral: someQuery`) replaces the parent's result column
+  // outright — the SQL is `SELECT "lateral_passthru".result`, not `to_jsonb(parent.*)`.
+  // So a null result unambiguously means the lateral matched nothing: `to_jsonb(t.*)`
+  // is never null for a row that exists. Zero rows means the *parent* didn't match,
+  // which selectOne may legitimately return. Only `qr` tells those apart — one frame
+  // later applyDeserializeHook sees both as a falsy `values` — so the check lives here
+  // rather than in the serde walk, where the keyed form is enforced.
+  //
+  // Deliberately NOT enforceable: a passthru nested inside a *keyed* lateral. There
+  // the parent's column is the inner query's result column, so null means either
+  // "inner parent missing" (legal) or "innermost lateral missing" (a violation), and
+  // nothing in the result set separates them.
+  const assertPassthruPresent = (result: any) => {
+    if (!(lateral instanceof SQLFragment) || lateral.selectResultMode !== SelectResultMode.ExactlyOne) return;
+    // Many aggregates the rows, so a miss is a null *element*, not a null result.
+    const missing = mode === SelectResultMode.Many ?
+      Array.isArray(result) && result.some((r: any) => r === null) :
+      result === null;
+    if (missing) throw new NotExactlyOneError(query,
+      `One result expected for passthru lateral on '${alias}' but none returned ` +
+      '(hint: check `.query.compile()` on this Error)');
+  };
+
   query.runResultTransform =
 
     mode === SelectResultMode.Numeric ?
@@ -579,10 +602,15 @@ export const select: SelectSignatures = function (
         (qr) => {
           const result = qr.rows[0]?.result;
           if (result === undefined) throw new NotExactlyOneError(query, 'One result expected but none returned (hint: check `.query.compile()` on this Error)');
+          assertPassthruPresent(result);
           return applyDeserializeHook(table, result, lateral);
         } :
         // SelectResultMode.One or SelectResultMode.Many
-        (qr) => applyDeserializeHook(table, qr.rows[0]?.result, lateral);
+        (qr) => {
+          const result = qr.rows[0]?.result;
+          assertPassthruPresent(result);
+          return applyDeserializeHook(table, result, lateral);
+        };
 
   return query;
 };
