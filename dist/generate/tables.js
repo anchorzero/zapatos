@@ -1,7 +1,7 @@
 "use strict";
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -55,7 +55,8 @@ const columnsForRelation = async (rel, schemaName, queryFn) => {
         LEFT JOIN pg_catalog.pg_type t1 ON t1.oid = a.atttypid
         LEFT JOIN pg_catalog.pg_type t2 ON t2.oid = t1.typbasetype
         LEFT JOIN pg_catalog.pg_description d ON d.objoid = c.oid AND d.objsubid = a.attnum
-        WHERE c.relkind = 'm' AND a.attnum >= 1 AND c.relname = $1 AND n.nspname = $2`
+        WHERE c.relkind = 'm' AND a.attnum >= 1 AND c.relname = $1 AND n.nspname = $2
+        ORDER BY "column"`
             : `
         SELECT
           column_name AS "column"
@@ -70,7 +71,8 @@ const columnsForRelation = async (rel, schemaName, queryFn) => {
         LEFT JOIN pg_catalog.pg_namespace ns ON ns.nspname = c.table_schema
         LEFT JOIN pg_catalog.pg_class cl ON cl.relkind = 'r' AND cl.relname = c.table_name AND cl.relnamespace = ns.oid
         LEFT JOIN pg_catalog.pg_description d ON d.objoid = cl.oid AND d.objsubid = c.ordinal_position
-        WHERE c.table_name = $1 AND c.table_schema = $2`,
+        WHERE c.table_name = $1 AND c.table_schema = $2
+        ORDER BY "column"`,
         values: [rel.name, schemaName],
     });
     return rows;
@@ -85,7 +87,7 @@ config, queryFn) => {
     rows.forEach(row => {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
         const { column, isGenerated, isNullable, hasDefault, udtName, domainName } = row;
-        let selectableType = (_b = (_a = serde_1.TYPE_HOOK[rel.name]) === null || _a === void 0 ? void 0 : _a[column]) !== null && _b !== void 0 ? _b : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "Selectable"), JSONSelectableType = (_d = (_c = serde_1.TYPE_HOOK[rel.name]) === null || _c === void 0 ? void 0 : _c[column]) !== null && _d !== void 0 ? _d : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "JSONSelectable"), whereableType = (_f = (_e = serde_1.TYPE_HOOK[rel.name]) === null || _e === void 0 ? void 0 : _e[column]) !== null && _f !== void 0 ? _f : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "Whereable"), insertableType = (_h = (_g = serde_1.TYPE_HOOK[rel.name]) === null || _g === void 0 ? void 0 : _g[column]) !== null && _h !== void 0 ? _h : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "Insertable"), updatableType = (_k = (_j = serde_1.TYPE_HOOK[rel.name]) === null || _j === void 0 ? void 0 : _j[column]) !== null && _k !== void 0 ? _k : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "Updatable");
+        let selectableType = (_b = (_a = serde_1.TYPE_HOOK[rel.name]) === null || _a === void 0 ? void 0 : _a[column]) !== null && _b !== void 0 ? _b : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "Selectable", config), JSONSelectableType = (_d = (_c = serde_1.TYPE_HOOK[rel.name]) === null || _c === void 0 ? void 0 : _c[column]) !== null && _d !== void 0 ? _d : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "JSONSelectable", config), whereableType = (_f = (_e = serde_1.TYPE_HOOK[rel.name]) === null || _e === void 0 ? void 0 : _e[column]) !== null && _f !== void 0 ? _f : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "Whereable", config), insertableType = (_h = (_g = serde_1.TYPE_HOOK[rel.name]) === null || _g === void 0 ? void 0 : _g[column]) !== null && _h !== void 0 ? _h : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "Insertable", config), updatableType = (_k = (_j = serde_1.TYPE_HOOK[rel.name]) === null || _j === void 0 ? void 0 : _j[column]) !== null && _k !== void 0 ? _k : (0, pgTypes_1.tsTypeForPgType)(udtName, enums, "Updatable", config);
         const columnDoc = createColumnDoc(config, schemaName, rel, row), schemaPrefix = config.unprefixedSchema === schemaName ? '' : `${schemaName}.`, prefixedRelName = schemaPrefix + rel.name, columnOptions = (_l = (config.columnOptions[prefixedRelName] && config.columnOptions[prefixedRelName][column])) !== null && _l !== void 0 ? _l : (config.columnOptions["*"] && config.columnOptions["*"][column]), isInsertable = rel.insertable && !isGenerated && (columnOptions === null || columnOptions === void 0 ? void 0 : columnOptions.insert) !== 'excluded', isUpdatable = rel.insertable && !isGenerated && (columnOptions === null || columnOptions === void 0 ? void 0 : columnOptions.update) !== 'excluded', insertablyOptional = isNullable || hasDefault || (columnOptions === null || columnOptions === void 0 ? void 0 : columnOptions.insert) === 'optional' ? '?' : '', orNull = isNullable ? ' | null' : '', orDefault = isNullable || hasDefault ? ' | db.DefaultType' : '', possiblyQuotedColumn = quoteIfIllegalIdentifier(column);
         // Now, 4 cases: 
         //   1. null domain, known udt        <-- standard case

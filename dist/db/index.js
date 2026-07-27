@@ -1,7 +1,7 @@
 "use strict";
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -36,4 +36,5 @@ __exportStar(require("./shortcuts"), exports);
 __exportStar(require("./transaction"), exports);
 var utils_1 = require("./utils");
 Object.defineProperty(exports, "mapWithSeparator", { enumerable: true, get: function () { return utils_1.mapWithSeparator; } });
+__exportStar(require("./customJSON"), exports);
 exports.conditions = require("./conditions");

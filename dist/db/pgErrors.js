@@ -1,11 +1,11 @@
 "use strict";
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isDatabaseError = void 0;
+exports.isDatabaseError = isDatabaseError;
 /**
  * Check whether an error object matches any of a set of Postgres error types.
  * @param err The error to check
@@ -17,7 +17,6 @@ function isDatabaseError(err, ...types) {
         return false;
     return types.some(type => code.startsWith(pgErrors[type]));
 }
-exports.isDatabaseError = isDatabaseError;
 const pgErrors = {
     SuccessfulCompletion: "00",
     Warning: "01",

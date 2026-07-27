@@ -1,11 +1,11 @@
 "use strict";
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.subtract = exports.add = exports.now = exports.before = exports.after = exports.fromNow = exports.not = exports.and = exports.or = exports.isNotIn = exports.isIn = exports.notReImatch = exports.notReMatch = exports.reImatch = exports.reMatch = exports.notSimilarTo = exports.similarTo = exports.notIlike = exports.ilike = exports.notLike = exports.like = exports.notBetweenSymmetric = exports.notBetween = exports.betweenSymmetric = exports.between = exports.lte = exports.lt = exports.gte = exports.gt = exports.ne = exports.eq = exports.isNotDistinctFrom = exports.isDistinctFrom = exports.isNotUnknown = exports.isUnknown = exports.isNotFalse = exports.isFalse = exports.isNotTrue = exports.isTrue = exports.isNotNull = exports.isNull = void 0;
+exports.subtract = exports.add = exports.now = exports.before = exports.after = exports.fromNow = exports.arrayOverlaps = exports.arrayContainedIn = exports.arrayContains = exports.not = exports.and = exports.or = exports.isNotIn = exports.isIn = exports.notReImatch = exports.notReMatch = exports.reImatch = exports.reMatch = exports.notSimilarTo = exports.similarTo = exports.notIlike = exports.ilike = exports.notLike = exports.like = exports.notBetweenSymmetric = exports.notBetween = exports.betweenSymmetric = exports.between = exports.lte = exports.lt = exports.gte = exports.gt = exports.ne = exports.eq = exports.isNotDistinctFrom = exports.isDistinctFrom = exports.isNotUnknown = exports.isUnknown = exports.isNotFalse = exports.isFalse = exports.isNotTrue = exports.isTrue = exports.isNotNull = exports.isNull = void 0;
 const core_1 = require("./core");
 const utils_1 = require("./utils");
 const conditionalParam = (a) => a instanceof core_1.SQLFragment || a instanceof core_1.ParentColumn || a instanceof core_1.Parameter ? a : (0, core_1.param)(a);
@@ -71,6 +71,12 @@ const and = (...conditions) => (0, core_1.sql) `(${(0, utils_1.mapWithSeparator)
 exports.and = and;
 const not = (condition) => (0, core_1.sql) `(NOT ${condition})`;
 exports.not = not;
+const arrayContains = (a) => (0, core_1.sql) `${core_1.self} @> ${conditionalParam(a)}`;
+exports.arrayContains = arrayContains;
+const arrayContainedIn = (a) => (0, core_1.sql) `${core_1.self} <@ ${conditionalParam(a)}`;
+exports.arrayContainedIn = arrayContainedIn;
+const arrayOverlaps = (a) => (0, core_1.sql) `${core_1.self} && ${conditionalParam(a)}`;
+exports.arrayOverlaps = arrayOverlaps;
 const fromNow = (n, unit = 'millisecond') => (0, core_1.sql) `now() + ${(0, core_1.param)(String(n) + ' ' + unit)}`;
 exports.fromNow = fromNow;
 exports.after = exports.gt;

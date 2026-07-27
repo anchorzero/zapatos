@@ -1,8 +1,8 @@
 import type * as pg from 'pg';
 export interface RequiredConfig {
-    db: pg.ClientConfig;
 }
 export interface OptionalConfig {
+    db: pg.ClientConfig;
     outDir: string;
     outExt: string;
     schemas: SchemaRules;
@@ -15,6 +15,7 @@ export interface OptionalConfig {
     unprefixedSchema: string | null;
     types: Record<string, Record<string, string>>;
     preamble: string[];
+    customJSONParsingForLargeNumbers: boolean;
 }
 interface SchemaRules {
     [schema: string]: {

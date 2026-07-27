@@ -1,5 +1,6 @@
 import { Column, ColumnForTable, InsertableForTable, SelectableForTable, Table, Whereable, WhereableForTable } from "zapatos/schema";
 import { type FullLateralOption } from "./shortcuts";
+import { SQLFragment } from "./core";
 export interface Hook<U, V> {
     [t: Table]: {
         [c: Column]: (x: U) => V;
@@ -11,7 +12,7 @@ export declare const TYPE_HOOK: {
     };
 };
 export declare const PREAMBLE: string[];
-export declare function applyHookForWhere<T extends Table, U, W>(table: T, where: Whereable): InsertableForTable<T>;
+export declare function applyHookForWhere<T extends Table, U, W>(table: T, where: Whereable): SQLFragment<any, any> | InsertableForTable<T> | InsertableForTable<T>[];
 export declare function applyDeserializeHook<T extends Table>(table: T, values: SelectableForTable<T> | SelectableForTable<T>[] | undefined, lateral?: FullLateralOption): undefined | SelectableForTable<T> | SelectableForTable<T>[];
 export declare function applySerializeHook<T extends Table>(table: T, values: InsertableForTable<T> | InsertableForTable<T>[] | WhereableForTable<T>): InsertableForTable<T> | InsertableForTable<T>[] | WhereableForTable<T>;
 export declare function registerDeserializeHook<T extends Table, U>(table: T, column: Column, f: (x: any) => U): void;

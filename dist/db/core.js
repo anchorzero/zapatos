@@ -1,11 +1,18 @@
 "use strict";
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SQLFragment = exports.sql = exports.parent = exports.ParentColumn = exports.vals = exports.ColumnValues = exports.cols = exports.ColumnNames = exports.raw = exports.DangerousRawString = exports.param = exports.Parameter = exports.toBuffer = exports.strict = exports.all = exports.self = exports.Default = void 0;
+exports.SQLFragment = exports.ParentColumn = exports.ColumnValues = exports.ColumnNames = exports.DangerousRawString = exports.Parameter = exports.toBuffer = exports.all = exports.self = exports.Default = void 0;
+exports.strict = strict;
+exports.param = param;
+exports.raw = raw;
+exports.cols = cols;
+exports.vals = vals;
+exports.parent = parent;
+exports.sql = sql;
 const config_1 = require("./config");
 const utils_1 = require("./utils");
 const timing = typeof performance === 'object' ?
@@ -50,7 +57,6 @@ function strict(fn) {
         return (d === null ? null : fn(d));
     };
 }
-exports.strict = strict;
 /**
  * Convert a `bytea` hex representation to a JavaScript `Buffer`. Note: for
  * large objects, use something like
@@ -92,7 +98,6 @@ exports.Parameter = Parameter;
  * parameters `castArrayParamsToJson` and `castObjectParamsToJson`).
  */
 function param(x, cast) { return new Parameter(x, cast); }
-exports.param = param;
 /**
  * 💥💥💣 **DANGEROUS** 💣💥💥
  *
@@ -116,7 +121,6 @@ exports.DangerousRawString = DangerousRawString;
  * enable SQL injection attacks.
  */
 function raw(x) { return new DangerousRawString(x); }
-exports.raw = raw;
 /**
  * Wraps either an array or object, and compiles to a quoted, comma-separated
  * list of array values (for use in a `SELECT` query) or object keys (for use
@@ -135,7 +139,6 @@ exports.ColumnNames = ColumnNames;
  * `UPSERT` query alongside a `ColumnValues`).
  */
 function cols(x) { return new ColumnNames(x); }
-exports.cols = cols;
 /**
  * Compiles to a quoted, comma-separated list of object keys for use in an
  * `INSERT`, `UPDATE` or `UPSERT` query, alongside `ColumnNames`.
@@ -152,7 +155,6 @@ exports.ColumnValues = ColumnValues;
  * or UPSERT query alongside a `ColumnNames`.
  */
 function vals(x) { return new ColumnValues(x); }
-exports.vals = vals;
 /**
  * Compiles to the name of the column it wraps in the table of the parent query.
  * @param value The column name
@@ -168,7 +170,6 @@ exports.ParentColumn = ParentColumn;
  * that column name of the table of the parent query.
  */
 function parent(x) { return new ParentColumn(x); }
-exports.parent = parent;
 // === SQL tagged template strings ===
 /**
  * Tagged template function returning a `SQLFragment`. The first generic type
@@ -179,7 +180,6 @@ exports.parent = parent;
 function sql(literals, ...expressions) {
     return new SQLFragment(Array.prototype.slice.apply(literals), expressions);
 }
-exports.sql = sql;
 let preparedNameSeq = 0;
 class SQLFragment {
     constructor(literals, expressions) {
@@ -227,7 +227,7 @@ class SQLFragment {
                 result = this.noopResult;
             }
             if (resultListener)
-                resultListener(result, txnId, timing() - startMs);
+                resultListener(result, txnId, timing() - startMs, query);
             return result;
         };
         /**
@@ -389,6 +389,20 @@ class SQLFragment {
     }
     setExpressions(expressions) {
         this.expressions = expressions;
+    }
+    /**
+     * Performs a shallow copy of this SQLFragment, optionally overriding some of its properties.
+     * @param override The properties to override
+     */
+    copy(override) {
+        const { literals = this.literals, expressions = this.expressions, ...overrideRest } = override !== null && override !== void 0 ? override : {};
+        const copy = new SQLFragment(literals, expressions);
+        return Object.assign(copy, {
+            parentTable: this.parentTable,
+            preparedName: this.preparedName,
+            noop: this.noop,
+            noopResult: this.noopResult
+        }, overrideRest);
     }
 }
 exports.SQLFragment = SQLFragment;

@@ -1,7 +1,7 @@
 "use strict";
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -21,6 +21,7 @@ const defaultConfig = {
     unprefixedSchema: 'public',
     types: {},
     preamble: [],
+    customJSONParsingForLargeNumbers: false,
 };
 const moduleRoot = () => {
     // __dirname could be either ./generate (ts) or ./dist/generate (js)
@@ -32,8 +33,6 @@ const moduleRoot = () => {
 exports.moduleRoot = moduleRoot;
 const finaliseConfig = (config) => {
     const finalConfig = { ...defaultConfig, ...config };
-    if (!finalConfig.db || Object.keys(finalConfig.db).length < 1)
-        throw new Error(`Zapatos needs database connection details`);
     return finalConfig;
 };
 exports.finaliseConfig = finaliseConfig;

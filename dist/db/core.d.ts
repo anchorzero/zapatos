@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import type * as pg from 'pg';
 import { SQLQuery } from './config';
 import { NoInfer } from './utils';
@@ -27,9 +26,10 @@ export type JSONObject = {
 };
 export type JSONArray = JSONValue[];
 /**
- * `int8` value represented as a string
+ * `int8` or `numeric` value represented as a string
  */
 export type Int8String = `${number}`;
+export type NumericString = `${number}`;
 /**
  * Generic range value represented as a string
  */
@@ -78,7 +78,7 @@ export declare function strict<FnIn, FnOut>(fn: (x: FnIn) => FnOut): <T extends 
  *
  * @param ba The `ByteArrayString` hex representation (or `null`)
  */
-export declare const toBuffer: <T extends `\\x${string}` | null>(d: T) => T extends `\\x${string}` ? Buffer | Exclude<T, `\\x${string}`> : T;
+export declare const toBuffer: <T extends `\\x${string}` | null>(d: T) => T extends `\\x${string}` ? Buffer<ArrayBuffer> | Exclude<T, `\\x${string}`> : T;
 /**
  * Compiles to a numbered query parameter (`$1`, `$2`, etc) and adds the wrapped value
  * at the appropriate position of the values array passed to `pg`.
@@ -93,8 +93,8 @@ export declare const toBuffer: <T extends `\\x${string}` | null>(d: T) => T exte
  */
 export declare class Parameter<T = any> {
     value: T;
-    cast?: string | boolean | undefined;
-    constructor(value: T, cast?: string | boolean | undefined);
+    cast?: boolean | string | undefined;
+    constructor(value: T, cast?: boolean | string | undefined);
 }
 /**
  * Returns a `Parameter` instance, which compiles to a numbered query parameter
@@ -203,6 +203,18 @@ export declare class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint 
     constructor(literals: string[], expressions: SQL[]);
     getExpressions(): SQL[];
     setExpressions(expressions: SQL[]): void;
+    /**
+     * Performs a shallow copy of this SQLFragment, optionally overriding some of its properties.
+     * @param override The properties to override
+     */
+    copy(override?: {
+        literals?: string[];
+        expressions?: SQL[];
+        parentTable?: string;
+        preparedName?: string;
+        noop?: boolean;
+        noopResult?: any;
+    }): SQLFragment<RunResult, Constraint>;
     /**
      * Instruct Postgres to treat this as a prepared statement: see
      * https://node-postgres.com/features/queries#prepared-statements

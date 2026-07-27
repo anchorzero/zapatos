@@ -17,7 +17,7 @@ export declare const wait: (delayMs: number) => Promise<unknown>;
  * @param separator Separator value
  * @param cb Mapping function
  */
-export declare const mapWithSeparator: <TIn, TSep, TOut>(arr: readonly TIn[], separator: TSep, cb: (x: TIn, i: number, a: readonly TIn[]) => TOut) => (TSep | TOut)[];
+export declare const mapWithSeparator: <TIn, TSep, TOut>(arr: readonly TIn[], separator: TSep, cb: (x: TIn, i: number, a: readonly TIn[]) => TOut) => (TOut | TSep)[];
 /**
  * Map an array of objects to an output array by taking the union of all objects' keys
  * and ensuring that any key not present on any object gets a default value.
