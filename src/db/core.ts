@@ -1,6 +1,6 @@
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
@@ -48,9 +48,10 @@ export type JSONObject = { [k: string]: JSONValue };
 export type JSONArray = JSONValue[];
 
 /**
- * `int8` value represented as a string
+ * `int8` or `numeric` value represented as a string
  */
 export type Int8String = `${number}`;
+export type NumericString = `${number}`;
 
 /**
  * Generic range value represented as a string
@@ -251,6 +252,28 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
     this.expressions = expressions
   }
   /**
+   * Performs a shallow copy of this SQLFragment, optionally overriding some of its properties.
+   * @param override The properties to override
+   */
+  copy(override?: {
+    literals?: string[];
+    expressions?: SQL[];
+    parentTable?: string;
+    preparedName?: string;
+    noop?: boolean;
+    noopResult?: any;
+  }): SQLFragment<RunResult, Constraint> {
+    const { literals = this.literals, expressions = this.expressions, ...overrideRest } = override ?? {};
+    const copy = new SQLFragment<RunResult, Constraint>(literals, expressions);
+    return Object.assign(copy, {
+      parentTable: this.parentTable,
+      preparedName: this.preparedName,
+      noop: this.noop,
+      noopResult: this.noopResult
+    }, overrideRest);
+  }
+
+  /**
    * Instruct Postgres to treat this as a prepared statement: see
    * https://node-postgres.com/features/queries#prepared-statements
    * @param name A name for the prepared query. If not specified, it takes the
@@ -286,7 +309,7 @@ export class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never>
       result = this.noopResult;
     }
 
-    if (resultListener) resultListener(result, txnId, timing() - startMs!);
+    if (resultListener) resultListener(result, txnId, timing() - startMs!, query);
     return result;
   };
 

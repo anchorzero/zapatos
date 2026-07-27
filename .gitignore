@@ -1,2 +1,9 @@
-.DS_Store
 node_modules/
+.DS_Store
+
+# NOTE: upstream ignores dist/, we deliberately do not.
+# The monorepo installs this fork straight from a git tarball
+# (pnpm-workspace.yaml: zapatos: git+https://github.com/anchorzero/zapatos.git#<sha>),
+# and package.json "files" ships dist/db + dist/generate — so the built output has
+# to be committed or every consumer installs an empty package. Expect this line to
+# re-conflict on the next upstream merge; keep ours.

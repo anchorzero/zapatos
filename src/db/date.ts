@@ -1,6 +1,6 @@
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
@@ -30,13 +30,13 @@ export type TimeTzString = `${TimeString}${TzSuffix}`;
 
 /**
  * An ISO8601-formatted date and time string **with no timezone**, such as
- * `"2021-05-25T14:41.10.249097"`.
+ * `"2021-05-25T14:41:10.249097"`.
  */
 export type TimestampString = `${DateString}T${TimeString}`;
 
 /**
  * An ISO8601-formatted date, time and (numeric) timezone string, such as
- * `"2021-05-25T14:41.10.249097+01:00"`.
+ * `"2021-05-25T14:41:10.249097+01:00"`.
  */
 export type TimestampTzString = `${TimestampString}${TzSuffix}`;
 
