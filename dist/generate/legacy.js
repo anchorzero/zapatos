@@ -1,11 +1,11 @@
 "use strict";
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.srcWarning = void 0;
+exports.srcWarning = srcWarning;
 const path = require("path");
 const fs = require("fs");
 const recurseNodes = (node) => fs.statSync(node).isFile() ? [node] :
@@ -74,4 +74,3 @@ Thank you.
 `);
     }
 }
-exports.srcWarning = srcWarning;

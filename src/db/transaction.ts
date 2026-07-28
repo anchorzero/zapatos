@@ -1,6 +1,6 @@
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
@@ -53,8 +53,15 @@ export type TxnClientForSerializableRODeferrable = TxnClient<IsolationSatisfying
 function typeofQueryable(queryable: Queryable) {
   if (queryable instanceof pg.Pool) return 'pool';
   if (queryable instanceof pg.Client) return 'client';
-  if (pg.native !== null && queryable instanceof pg.native.Pool) return 'pool';
-  if (pg.native !== null && queryable instanceof pg.native.Client) return 'client';
+
+  if (
+    Object.prototype.hasOwnProperty.call(pg, 'native') &&
+    Object.prototype.propertyIsEnumerable.call(pg, 'native') &&
+    pg.native
+  ) {
+    if (queryable instanceof pg.native.Pool) return 'pool';
+    if (queryable instanceof pg.native.Client) return 'pool';
+  }
 
   // for pg < 8, and sometimes in 8.x for reasons that aren't clear, all the
   // instanceof checks fail: then we resort to testing for the private variable

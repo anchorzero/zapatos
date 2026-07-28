@@ -1,5 +1,5 @@
 import type { JSONSelectableForTable, WhereableForTable, InsertableForTable, UpdatableForTable, ColumnForTable, UniqueIndexForTable, SQLForTable, Table } from 'zapatos/schema';
-import { AllType, SQLFragment } from './core';
+import { AllType, all, SQLFragment } from './core';
 import { NoInfer } from './utils';
 export type JSONOnlyColsForTable<T extends Table, C extends any[]> = Pick<JSONSelectableForTable<T>, C[number]>;
 export interface SQLFragmentMap {
@@ -8,18 +8,18 @@ export interface SQLFragmentMap {
 export interface SQLFragmentOrColumnMap<T extends Table> {
     [k: string]: SQLFragment<any> | ColumnForTable<T>;
 }
-export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ? RunResult : never;
+export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ? (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) : never;
 export type LateralResult<L extends SQLFragmentMap> = {
     [K in keyof L]: RunResultForSQLFragment<L[K]>;
 };
 export type ExtrasResult<T extends Table, E extends SQLFragmentOrColumnMap<T>> = {
     [K in keyof E]: E[K] extends SQLFragment<any> ? RunResultForSQLFragment<E[K]> : E[K] extends keyof JSONSelectableForTable<T> ? JSONSelectableForTable<T>[E[K]] : never;
 };
-type ExtrasOption<T extends Table> = SQLFragmentOrColumnMap<T> | undefined;
-type ColumnsOption<T extends Table> = readonly ColumnForTable<T>[] | undefined;
+export type ExtrasOption<T extends Table> = SQLFragmentOrColumnMap<T> | undefined;
+export type ColumnsOption<T extends Table> = readonly ColumnForTable<T>[] | undefined;
 type LimitedLateralOption = SQLFragmentMap | undefined;
 export type FullLateralOption = LimitedLateralOption | SQLFragment<any>;
-type LateralOption<C extends ColumnsOption<Table>, E extends ExtrasOption<Table>> = undefined extends C ? undefined extends E ? FullLateralOption : LimitedLateralOption : LimitedLateralOption;
+export type LateralOption<C extends ColumnsOption<Table>, E extends ExtrasOption<Table>> = undefined extends C ? undefined extends E ? FullLateralOption : LimitedLateralOption : LimitedLateralOption;
 export interface ReturningOptionsForTable<T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>> {
     returning?: C;
     extras?: E;
@@ -58,7 +58,7 @@ type UpdateColumns<T extends Table> = ColumnForTable<T> | ColumnForTable<T>[];
 interface UpsertOptions<T extends Table, C extends ColumnsOption<T>, E extends ExtrasOption<T>, UC extends UpdateColumns<T> | undefined, RA extends UpsertReportAction | undefined> extends ReturningOptionsForTable<T, C, E> {
     updateValues?: UpdatableForTable<T>;
     updateColumns?: UC;
-    noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[];
+    noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[] | typeof all;
     reportAction?: RA;
 }
 interface UpsertSignatures {

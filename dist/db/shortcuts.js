@@ -1,11 +1,12 @@
 "use strict";
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.max = exports.min = exports.avg = exports.sum = exports.count = exports.selectExactlyOne = exports.selectOne = exports.select = exports.NotExactlyOneError = exports.SelectResultMode = exports.truncate = exports.deletes = exports.update = exports.upsert = exports.doNothing = exports.constraint = exports.Constraint = exports.insert = void 0;
+exports.max = exports.min = exports.avg = exports.sum = exports.count = exports.selectExactlyOne = exports.selectOne = exports.select = exports.NotExactlyOneError = exports.SelectResultMode = exports.truncate = exports.deletes = exports.update = exports.upsert = exports.doNothing = exports.Constraint = exports.insert = void 0;
+exports.constraint = constraint;
 const core_1 = require("./core");
 const serde_1 = require("./serde");
 const utils_1 = require("./utils");
@@ -58,7 +59,6 @@ exports.Constraint = Constraint;
  * for use as the arbiter constraint of an `upsert` shortcut query.
  */
 function constraint(x) { return new Constraint(x); }
-exports.constraint = constraint;
 exports.doNothing = [];
 /**
  * Generate an 'upsert' (`INSERT ... ON CONFLICT ...`) query `SQLFragment`.
@@ -79,7 +79,7 @@ const upsert = function (table, values, conflictTarget, options) {
     if (typeof conflictTarget === 'string')
         conflictTarget = [conflictTarget]; // now either Column[] or Constraint
     let noNullUpdateColumns = (_a = options === null || options === void 0 ? void 0 : options.noNullUpdateColumns) !== null && _a !== void 0 ? _a : [];
-    if (!Array.isArray(noNullUpdateColumns))
+    if (noNullUpdateColumns !== core_1.all && !Array.isArray(noNullUpdateColumns))
         noNullUpdateColumns = [noNullUpdateColumns];
     let specifiedUpdateColumns = options === null || options === void 0 ? void 0 : options.updateColumns;
     if (specifiedUpdateColumns && !Array.isArray(specifiedUpdateColumns))
@@ -88,7 +88,7 @@ const upsert = function (table, values, conflictTarget, options) {
         [...(_c = specifiedUpdateColumns) !== null && _c !== void 0 ? _c : colNames, ...Object.keys(updateValues)])], conflictTargetSQL = Array.isArray(conflictTarget) ?
         (0, core_1.sql) `(${(0, utils_1.mapWithSeparator)(conflictTarget, (0, core_1.sql) `, `, c => c)})` :
         (0, core_1.sql) `ON CONSTRAINT ${conflictTarget.value}`, updateColsSQL = (0, utils_1.mapWithSeparator)(updateColumns, (0, core_1.sql) `, `, c => c), updateValuesSQL = (0, utils_1.mapWithSeparator)(updateColumns, (0, core_1.sql) `, `, c => updateValues[c] !== undefined ? updateValues[c] :
-        noNullUpdateColumns.includes(c) ? (0, core_1.sql) `CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
+        (noNullUpdateColumns === core_1.all || noNullUpdateColumns.includes(c)) ? (0, core_1.sql) `CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
             (0, core_1.sql) `EXCLUDED.${c}`), returningSQL = SQLForColumnsOfTable(options === null || options === void 0 ? void 0 : options.returning, table), extrasSQL = SQLForExtras(options === null || options === void 0 ? void 0 : options.extras), suppressReport = (options === null || options === void 0 ? void 0 : options.reportAction) === 'suppress';
     // the added-on $action = 'INSERT' | 'UPDATE' key takes after SQL Server's approach to MERGE
     // (and on the use of xmax for this purpose, see: https://stackoverflow.com/questions/39058213/postgresql-upsert-differentiate-inserted-and-updated-rows-using-system-columns-x)
@@ -144,7 +144,7 @@ var SelectResultMode;
     SelectResultMode[SelectResultMode["One"] = 1] = "One";
     SelectResultMode[SelectResultMode["ExactlyOne"] = 2] = "ExactlyOne";
     SelectResultMode[SelectResultMode["Numeric"] = 3] = "Numeric";
-})(SelectResultMode = exports.SelectResultMode || (exports.SelectResultMode = {}));
+})(SelectResultMode || (exports.SelectResultMode = SelectResultMode = {}));
 class NotExactlyOneError extends Error {
     constructor(query, ...params) {
         super(...params);
@@ -180,7 +180,7 @@ const select = function (table, where = core_1.all, options = {}, mode = SelectR
     const limit1 = mode === SelectResultMode.One || mode === SelectResultMode.ExactlyOne, allOptions = limit1 ? { ...options, limit: 1 } : options, alias = allOptions.alias || table, { distinct, groupBy, having, lateral, columns, extras } = allOptions, lock = allOptions.lock === undefined || Array.isArray(allOptions.lock) ? allOptions.lock : [allOptions.lock], order = allOptions.order === undefined || Array.isArray(allOptions.order) ? allOptions.order : [allOptions.order], tableAliasSQL = alias === table ? [] : (0, core_1.sql) ` AS ${alias}`, distinctSQL = !distinct ? [] : (0, core_1.sql) ` DISTINCT${distinct instanceof core_1.SQLFragment || typeof distinct === 'string' ? (0, core_1.sql) ` ON (${distinct})` :
         Array.isArray(distinct) ? (0, core_1.sql) ` ON (${(0, core_1.cols)(distinct)})` : []}`, colsSQL = lateral instanceof core_1.SQLFragment ? [] :
         mode === SelectResultMode.Numeric ?
-            (columns ? (0, core_1.sql) `${(0, core_1.raw)(aggregate)}(${(0, core_1.cols)(columns)})` : (0, core_1.sql) `${(0, core_1.raw)(aggregate)}(${alias}.*)`) :
+            (columns ? (0, core_1.sql) `${(0, core_1.raw)(aggregate)}(${(0, core_1.cols)(columns)})` : (0, core_1.sql) `${(0, core_1.raw)(aggregate)}(*)`) :
             SQLForColumnsOfTable(columns, alias), colsExtraSQL = lateral instanceof core_1.SQLFragment || mode === SelectResultMode.Numeric ? [] : SQLForExtras(extras), colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric ? [] :
         lateral instanceof core_1.SQLFragment ? (0, core_1.sql) `"lateral_passthru".result` :
             (0, core_1.sql) ` || jsonb_build_object(${(0, utils_1.mapWithSeparator)(Object.keys(lateral).sort(), (0, core_1.sql) `, `, k => (0, core_1.sql) `${(0, core_1.param)(k)}::text, "lateral_${(0, core_1.raw)(k)}".result`)})`, allColsSQL = (0, core_1.sql) `${colsSQL}${colsExtraSQL}${colsLateralSQL}`, whereSQL = where === core_1.all ? [] : (0, core_1.sql) ` WHERE ${(0, serde_1.applyHookForWhere)(table, where)}`, 
@@ -201,12 +201,11 @@ const select = function (table, where = core_1.all, options = {}, mode = SelectR
         return (0, core_1.sql) ` FOR ${(0, core_1.raw)(lock.for)}${ofClause}${lock.wait ? (0, core_1.sql) ` ${(0, core_1.raw)(lock.wait)}` : []}`;
     }), lateralSQL = lateral === undefined ? [] :
         lateral instanceof core_1.SQLFragment ? (() => {
-            lateral.parentTable = alias;
-            return (0, core_1.sql) ` LEFT JOIN LATERAL (${lateral}) AS "lateral_passthru" ON true`;
+            return (0, core_1.sql) ` LEFT JOIN LATERAL (${lateral.copy({ parentTable: alias })}) AS "lateral_passthru" ON true`;
         })() :
             Object.keys(lateral).sort().map(k => {
-                const subQ = lateral[k];
-                subQ.parentTable = alias; // enables `parent('column')` in subquery's Whereables
+                /// enables `parent('column')` in subquery's Whereables
+                const subQ = lateral[k].copy({ parentTable: alias });
                 return (0, core_1.sql) ` LEFT JOIN LATERAL (${subQ}) AS "lateral_${(0, core_1.raw)(k)}" ON true`;
             });
     const rowsQuery = (0, core_1.sql) `SELECT${distinctSQL} ${allColsSQL} AS result FROM ${table}${tableAliasSQL}${lateralSQL}${whereSQL}${groupBySQL}${havingSQL}${orderSQL}${limitSQL}${offsetSQL}${lockSQL}`, query = mode !== SelectResultMode.Many ? rowsQuery :

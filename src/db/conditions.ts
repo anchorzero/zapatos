@@ -1,6 +1,6 @@
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
@@ -58,9 +58,13 @@ export const notReImatch = <T extends string>(a: T) => sql<SQL, boolean | null, 
 export const isIn = <T>(a: readonly T[]) => a.length > 0 ? sql<SQL, boolean | null, T>`${self} IN (${vals(a)})` : sql`false`;
 export const isNotIn = <T>(a: readonly T[]) => a.length > 0 ? sql<SQL, boolean | null, T>`${self} NOT IN (${vals(a)})` : sql`true`;
 
-export const or = <T>(...conditions: SQLFragment<any, T>[] | Whereable[]) => sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` OR `, c => c)})`;
-export const and = <T>(...conditions: SQLFragment<any, T>[] | Whereable[]) => sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` AND `, c => c)})`;
+export const or = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) => sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` OR `, c => c)})`;
+export const and = <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) => sql<SQL, boolean | null, T>`(${mapWithSeparator(conditions, sql` AND `, c => c)})`;
 export const not = <T>(condition: SQLFragment<any, T> | Whereable) => sql<SQL, boolean | null, T>`(NOT ${condition})`;
+
+export const arrayContains = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} @> ${conditionalParam(a)}`;
+export const arrayContainedIn = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} <@ ${conditionalParam(a)}`;
+export const arrayOverlaps = <T>(a: T[] | ParentColumn) => sql<SQL, boolean | null, T>`${self} && ${conditionalParam(a)}`;
 
 // things that aren't genuinely conditions
 type PluralisingIntervalUnit = 'microsecond' | 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year' | 'decade';

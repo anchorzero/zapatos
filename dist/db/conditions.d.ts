@@ -1,4 +1,4 @@
-import { SQLFragment } from './core';
+import { SQLFragment, ParentColumn } from './core';
 import type { Whereable } from 'zapatos/schema';
 export declare const isNull: SQLFragment<boolean, never>;
 export declare const isNotNull: SQLFragment<boolean, never>;
@@ -32,9 +32,12 @@ export declare const notReMatch: <T extends string>(a: T) => SQLFragment<boolean
 export declare const notReImatch: <T extends string>(a: T) => SQLFragment<boolean | null, T>;
 export declare const isIn: <T>(a: readonly T[]) => SQLFragment<any[], never> | SQLFragment<boolean | null, T>;
 export declare const isNotIn: <T>(a: readonly T[]) => SQLFragment<any[], never> | SQLFragment<boolean | null, T>;
-export declare const or: <T>(...conditions: SQLFragment<any, T>[] | Whereable[]) => SQLFragment<boolean | null, T>;
-export declare const and: <T>(...conditions: Whereable[] | SQLFragment<any, T>[]) => SQLFragment<boolean | null, T>;
-export declare const not: <T>(condition: Whereable | SQLFragment<any, T>) => SQLFragment<boolean | null, T>;
+export declare const or: <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) => SQLFragment<boolean | null, T>;
+export declare const and: <T>(...conditions: (SQLFragment<any, T> | Whereable)[]) => SQLFragment<boolean | null, T>;
+export declare const not: <T>(condition: SQLFragment<any, T> | Whereable) => SQLFragment<boolean | null, T>;
+export declare const arrayContains: <T>(a: T[] | ParentColumn) => SQLFragment<boolean | null, T>;
+export declare const arrayContainedIn: <T>(a: T[] | ParentColumn) => SQLFragment<boolean | null, T>;
+export declare const arrayOverlaps: <T>(a: T[] | ParentColumn) => SQLFragment<boolean | null, T>;
 type PluralisingIntervalUnit = 'microsecond' | 'millisecond' | 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year' | 'decade';
 type IntervalUnit = PluralisingIntervalUnit | `${PluralisingIntervalUnit}s` | 'century' | 'centuries' | 'millennium' | 'millennia';
 export declare const fromNow: (n: number, unit?: IntervalUnit) => SQLFragment<any[], never>;

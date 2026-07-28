@@ -1,6 +1,6 @@
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
@@ -50,19 +50,21 @@ export type JSONOnlyColsForTable<T extends Table, C extends any[] /* `ColumnForT
 
 export interface SQLFragmentMap { [k: string]: SQLFragment<any> }
 export interface SQLFragmentOrColumnMap<T extends Table> { [k: string]: SQLFragment<any> | ColumnForTable<T> }
-export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ? RunResult : never;
+export type RunResultForSQLFragment<T extends SQLFragment<any, any>> = T extends SQLFragment<infer RunResult, any> ?
+  (undefined extends RunResult ? NonNullable<RunResult> | null : RunResult) :
+  never;
 
 export type LateralResult<L extends SQLFragmentMap> = { [K in keyof L]: RunResultForSQLFragment<L[K]> };
 export type ExtrasResult<T extends Table, E extends SQLFragmentOrColumnMap<T>> = { [K in keyof E]:
   E[K] extends SQLFragment<any> ? RunResultForSQLFragment<E[K]> : E[K] extends keyof JSONSelectableForTable<T> ? JSONSelectableForTable<T>[E[K]] : never;
 };
 
-type ExtrasOption<T extends Table> = SQLFragmentOrColumnMap<T> | undefined;
-type ColumnsOption<T extends Table> = readonly ColumnForTable<T>[] | undefined;
+export type ExtrasOption<T extends Table> = SQLFragmentOrColumnMap<T> | undefined;
+export type ColumnsOption<T extends Table> = readonly ColumnForTable<T>[] | undefined;
 
 type LimitedLateralOption = SQLFragmentMap | undefined;
 export type FullLateralOption = LimitedLateralOption | SQLFragment<any>;
-type LateralOption<
+export type LateralOption<
   C extends ColumnsOption<Table>,
   E extends ExtrasOption<Table>,
 > =
@@ -185,7 +187,7 @@ interface UpsertOptions<
 > extends ReturningOptionsForTable<T, C, E> {
   updateValues?: UpdatableForTable<T>;
   updateColumns?: UC;
-  noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[];
+  noNullUpdateColumns?: ColumnForTable<T> | ColumnForTable<T>[] | typeof all;
   reportAction?: RA;
 }
 
@@ -240,7 +242,7 @@ export const upsert: UpsertSignatures = function (
   if (typeof conflictTarget === 'string') conflictTarget = [conflictTarget];  // now either Column[] or Constraint
 
   let noNullUpdateColumns = options?.noNullUpdateColumns ?? [];
-  if (!Array.isArray(noNullUpdateColumns)) noNullUpdateColumns = [noNullUpdateColumns];
+  if (noNullUpdateColumns !== all && !Array.isArray(noNullUpdateColumns)) noNullUpdateColumns = [noNullUpdateColumns];
 
   let specifiedUpdateColumns = options?.updateColumns;
   if (specifiedUpdateColumns && !Array.isArray(specifiedUpdateColumns)) specifiedUpdateColumns = [specifiedUpdateColumns];
@@ -262,7 +264,7 @@ export const upsert: UpsertSignatures = function (
     updateColsSQL = mapWithSeparator(updateColumns, sql`, `, c => c),
     updateValuesSQL = mapWithSeparator(updateColumns, sql`, `, c =>
       updateValues[c] !== undefined ? updateValues[c] :
-        noNullUpdateColumns.includes(c) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
+        (noNullUpdateColumns === all || noNullUpdateColumns.includes(c)) ? sql`CASE WHEN EXCLUDED.${c} IS NULL THEN ${table}.${c} ELSE EXCLUDED.${c} END` :
           sql`EXCLUDED.${c}`),
     returningSQL = SQLForColumnsOfTable(options?.returning, table),
     extrasSQL = SQLForExtras(options?.extras),
@@ -522,7 +524,7 @@ export const select: SelectSignatures = function (
       Array.isArray(distinct) ? sql` ON (${cols(distinct)})` : []}`,
     colsSQL = lateral instanceof SQLFragment ? [] :
       mode === SelectResultMode.Numeric ?
-        (columns ? sql`${raw(aggregate)}(${cols(columns)})` : sql`${raw(aggregate)}(${alias}.*)`) :
+        (columns ? sql`${raw(aggregate)}(${cols(columns)})` : sql`${raw(aggregate)}(*)`) :
         SQLForColumnsOfTable(columns, alias as Table),
     colsExtraSQL = lateral instanceof SQLFragment || mode === SelectResultMode.Numeric ? [] : SQLForExtras(extras),
     colsLateralSQL = lateral === undefined || mode === SelectResultMode.Numeric ? [] :
@@ -552,12 +554,11 @@ export const select: SelectSignatures = function (
     }),
     lateralSQL = lateral === undefined ? [] :
       lateral instanceof SQLFragment ? (() => {
-        lateral.parentTable = alias;
-        return sql` LEFT JOIN LATERAL (${lateral}) AS "lateral_passthru" ON true`;
+        return sql` LEFT JOIN LATERAL (${lateral.copy({ parentTable: alias })}) AS "lateral_passthru" ON true`;
       })() :
         Object.keys(lateral).sort().map(k => {
-          const subQ = lateral[k];
-          subQ.parentTable = alias;  // enables `parent('column')` in subquery's Whereables
+          /// enables `parent('column')` in subquery's Whereables
+          const subQ = lateral[k].copy({ parentTable: alias });
           return sql` LEFT JOIN LATERAL (${subQ}) AS "lateral_${raw(k)}" ON true`;
         });
 

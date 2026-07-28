@@ -12,7 +12,7 @@ export interface Config {
     castArrayParamsToJson: boolean;
     castObjectParamsToJson: boolean;
     queryListener?(query: SQLQuery, txnId?: number): void;
-    resultListener?(result: any, txnId?: number, elapsedMs?: number): void;
+    resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
     transactionListener?(message: string, txnId?: number): void;
 }
 export type NewConfig = Partial<Config>;
@@ -28,7 +28,7 @@ export declare const getConfig: () => {
     castArrayParamsToJson: boolean;
     castObjectParamsToJson: boolean;
     queryListener?(query: SQLQuery, txnId?: number): void;
-    resultListener?(result: any, txnId?: number, elapsedMs?: number): void;
+    resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
     transactionListener?(message: string, txnId?: number): void;
 };
 /**
@@ -43,7 +43,7 @@ export declare const setConfig: (newConfig: NewConfig) => {
     };
     castArrayParamsToJson: boolean;
     castObjectParamsToJson: boolean;
-    queryListener?: ((query: SQLQuery, txnId?: number) => void) | undefined;
-    resultListener?: ((result: any, txnId?: number, elapsedMs?: number) => void) | undefined;
-    transactionListener?: ((message: string, txnId?: number) => void) | undefined;
+    queryListener?: (query: SQLQuery, txnId?: number) => void;
+    resultListener?: (result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery) => void;
+    transactionListener?: (message: string, txnId?: number) => void;
 };

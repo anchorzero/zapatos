@@ -106,8 +106,10 @@ document.addEventListener('click', function (e) {
 
       tsDefs.setCompilerOptions({
         strict: true,
-        target: ts.ScriptTarget.ES2017,
+        target: ts.ScriptTarget.ES2020,
         module: ts.ModuleKind.ESNext,
+        allowSyntheticDefaultImports: true,
+        esModuleInterop: true,
       });
       for (var file in zapatosBundle) tsDefs.addExtraLib(zapatosBundle[file], `file:///${file}`);
 
@@ -116,7 +118,7 @@ document.addEventListener('click', function (e) {
         commonOpts = {
           minimap: { enabled: false },
           scrollBeyondLastLine: false,
-          fontFamily: 'source-code-pro',
+          fontFamily: 'Source Code Pro',
           fontSize: 15,
           theme: 'vs-dark',
           automaticLayout: true,  // resize with host <div>

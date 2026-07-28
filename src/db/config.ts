@@ -1,6 +1,6 @@
 /*
 Zapatos: https://jawj.github.io/zapatos/
-Copyright (C) 2020 - 2022 George MacKerron
+Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 
@@ -16,7 +16,7 @@ export interface Config {
   castArrayParamsToJson: boolean;   // see https://github.com/brianc/node-postgres/issues/2012
   castObjectParamsToJson: boolean;  // useful if json will be cast onward differently from text
   queryListener?(query: SQLQuery, txnId?: number): void;
-  resultListener?(result: any, txnId?: number, elapsedMs?: number): void;
+  resultListener?(result: any, txnId?: number, elapsedMs?: number, query?: SQLQuery): void;
   transactionListener?(message: string, txnId?: number): void;
 }
 export type NewConfig = Partial<Config>;
