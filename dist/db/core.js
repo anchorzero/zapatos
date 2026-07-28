@@ -5,7 +5,7 @@ Copyright (C) 2020 - 2023 George MacKerron
 Released under the MIT licence: see LICENCE file
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SQLFragment = exports.ParentColumn = exports.ColumnValues = exports.ColumnNames = exports.DangerousRawString = exports.Parameter = exports.toBuffer = exports.all = exports.self = exports.Default = void 0;
+exports.SQLFragment = exports.NotExactlyOneError = exports.SelectResultMode = exports.ParentColumn = exports.ColumnValues = exports.ColumnNames = exports.DangerousRawString = exports.Parameter = exports.toBuffer = exports.all = exports.self = exports.Default = void 0;
 exports.strict = strict;
 exports.param = param;
 exports.raw = raw;
@@ -181,6 +181,31 @@ function sql(literals, ...expressions) {
     return new SQLFragment(Array.prototype.slice.apply(literals), expressions);
 }
 let preparedNameSeq = 0;
+/**
+ * The result cardinality a `select` shortcut was built for.
+ *
+ * Lives here rather than in shortcuts.ts (where it is used) because serde.ts
+ * needs it at runtime to enforce `ExactlyOne` inside laterals, and shortcuts.ts
+ * already imports serde.ts — putting it there would close a require cycle.
+ * core.ts imports neither, so it is the natural floor for both.
+ */
+var SelectResultMode;
+(function (SelectResultMode) {
+    SelectResultMode[SelectResultMode["Many"] = 0] = "Many";
+    SelectResultMode[SelectResultMode["One"] = 1] = "One";
+    SelectResultMode[SelectResultMode["ExactlyOne"] = 2] = "ExactlyOne";
+    SelectResultMode[SelectResultMode["Numeric"] = 3] = "Numeric";
+})(SelectResultMode || (exports.SelectResultMode = SelectResultMode = {}));
+class NotExactlyOneError extends Error {
+    constructor(query, ...params) {
+        super(...params);
+        if (Error.captureStackTrace)
+            Error.captureStackTrace(this, NotExactlyOneError); // V8 only
+        this.name = 'NotExactlyOneError';
+        this.query = query; // custom property
+    }
+}
+exports.NotExactlyOneError = NotExactlyOneError;
 class SQLFragment {
     constructor(literals, expressions) {
         this.literals = literals;
@@ -194,6 +219,14 @@ class SQLFragment {
         this.runResultTransform = qr => qr.rows;
         this.parentTable = undefined; // used for nested shortcut select queries
         this.preparedName = undefined; // for prepared statements
+        /**
+         * Which `select` shortcut produced this fragment, if any. Set by `select()`.
+         *
+         * A lateral sub-query is never `.run()`, so its `runResultTransform` — and the
+         * `ExactlyOne` check inside it — is dead code. Recording the mode on the
+         * fragment is what lets the deserialize walk in serde.ts enforce it instead.
+         */
+        this.selectResultMode = undefined;
         this.noop = false; // if true, bypass actually running the query unless forced to e.g. for empty INSERTs
         /**
          * Instruct Postgres to treat this as a prepared statement: see
@@ -401,7 +434,8 @@ class SQLFragment {
             parentTable: this.parentTable,
             preparedName: this.preparedName,
             noop: this.noop,
-            noopResult: this.noopResult
+            noopResult: this.noopResult,
+            selectResultMode: this.selectResultMode
         }, overrideRest);
     }
 }

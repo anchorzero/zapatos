@@ -185,6 +185,24 @@ export type Queryable = pg.ClientBase | pg.Pool;
  * calling `.run(...)` on it, or using it as the value of an `extras` object).
  */
 export declare function sql<Interpolations = SQL, RunResult = pg.QueryResult['rows'], Constraint = never>(literals: TemplateStringsArray, ...expressions: NoInfer<Interpolations>[]): SQLFragment<RunResult, Constraint>;
+/**
+ * The result cardinality a `select` shortcut was built for.
+ *
+ * Lives here rather than in shortcuts.ts (where it is used) because serde.ts
+ * needs it at runtime to enforce `ExactlyOne` inside laterals, and shortcuts.ts
+ * already imports serde.ts — putting it there would close a require cycle.
+ * core.ts imports neither, so it is the natural floor for both.
+ */
+export declare enum SelectResultMode {
+    Many = 0,
+    One = 1,
+    ExactlyOne = 2,
+    Numeric = 3
+}
+export declare class NotExactlyOneError extends Error {
+    query: SQLFragment;
+    constructor(query: SQLFragment, ...params: any[]);
+}
 export declare class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint = never> {
     protected literals: string[];
     protected expressions: SQL[];
@@ -198,6 +216,14 @@ export declare class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint 
     runResultTransform: (qr: pg.QueryResult) => any;
     parentTable?: string;
     preparedName?: string;
+    /**
+     * Which `select` shortcut produced this fragment, if any. Set by `select()`.
+     *
+     * A lateral sub-query is never `.run()`, so its `runResultTransform` — and the
+     * `ExactlyOne` check inside it — is dead code. Recording the mode on the
+     * fragment is what lets the deserialize walk in serde.ts enforce it instead.
+     */
+    selectResultMode?: SelectResultMode;
     noop: boolean;
     noopResult: any;
     constructor(literals: string[], expressions: SQL[]);
@@ -214,6 +240,7 @@ export declare class SQLFragment<RunResult = pg.QueryResult['rows'], Constraint 
         preparedName?: string;
         noop?: boolean;
         noopResult?: any;
+        selectResultMode?: SelectResultMode;
     }): SQLFragment<RunResult, Constraint>;
     /**
      * Instruct Postgres to treat this as a prepared statement: see

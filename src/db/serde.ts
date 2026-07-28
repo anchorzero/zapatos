@@ -8,7 +8,14 @@ import {
   WhereableForTable,
 } from "zapatos/schema";
 import { type FullLateralOption } from "./shortcuts";
-import { ColumnValues, ParentColumn, SQL, SQLFragment } from "./core";
+import {
+  ColumnValues,
+  NotExactlyOneError,
+  ParentColumn,
+  SelectResultMode,
+  SQL,
+  SQLFragment,
+} from "./core";
 
 export interface Hook<U, V> {
   [t: Table]: { [c: Column]: (x: U) => V };
@@ -40,9 +47,39 @@ function applyHook<
 >(hook: Hook<U, W>, table: Table, values: V, lateral?: FullLateralOption): V {
   return (
     Array.isArray(values)
-      ? values.map<V>((v) => applyHookSingle(hook, table, v, lateral))
+      ? // A passthru lateral under `select` aggregates to an array with a null for
+        // every parent row the lateral missed; Object.entries(null) would throw a bare
+        // TypeError out of the serde walk. Nothing to deserialize, so pass it through.
+        values.map<V>((v) => (v == null ? v : applyHookSingle(hook, table, v, lateral)))
       : applyHookSingle(hook, table, values, lateral)
   ) as V;
+}
+
+/**
+ * A keyed lateral came back NULL. If the sub-query was a `selectExactlyOne`, that
+ * is a broken promise — the field is typed non-optional but holds nothing — so we
+ * throw, which is what the call site already claims happens.
+ *
+ * Anything else (`selectOne`, `select`, `count`) may legitimately be absent, and is
+ * left alone.
+ */
+function assertLateralPresent(parentTable: Table, lateralKey: string, subQ: unknown) {
+  if (!(subQ instanceof SQLFragment) || subQ.selectResultMode !== SelectResultMode.ExactlyOne) return;
+
+  throw new NotExactlyOneError(
+    // A copy, not subQ itself, for two reasons. The sub-query as stored in the
+    // `lateral` object has no parentTable — select() sets that on a defensive copy
+    // (upstream 6e64759) precisely so the original is not mutated — so compiling
+    // the original throws "table alias has no meaning here" the moment it uses
+    // db.parent(), making the hint below a lie. And mutating it here would
+    // reintroduce the sticky-parent bug that copy() exists to prevent.
+    // `instanceof` narrows to SQLFragment<any, any> while NotExactlyOneError.query
+    // uses the default generics; Constraint is a phantom field, so the cast only
+    // reconciles type parameters.
+    (subQ as SQLFragment).copy({ parentTable }),
+    `One result expected for lateral '${lateralKey}' on '${parentTable}' but none returned ` +
+    '(hint: check `.query.compile()` on this Error)',
+  );
 }
 
 function applyHookSingle<
@@ -85,9 +122,15 @@ function applyHookSingle<
       return lateral.runResultTransform(shim as any);
     } else {
       for (const [k, subQ] of Object.entries(lateral)) {
-        processed[k as T] = processed[k]
-          ? applyHook(hook, k as T, processed[k], subQ)
-          : processed[k];
+        const value = processed[k];
+        if (value === null || value === undefined) {
+          // A lateral is `LEFT JOIN LATERAL ... ON true`, so a missing row is NULL
+          // regardless of mode, and the sub-query's own ExactlyOne check never runs
+          // (a lateral is never `.run()`). This is the only place that can catch it.
+          assertLateralPresent(table, k, subQ);
+          continue;  // selectOne / select: an absent row is legal, leave the null in place
+        }
+        processed[k as T] = applyHook(hook, k as T, value, subQ);
       }
     }
   }

@@ -20,8 +20,35 @@ exports.PREAMBLE = [];
 var GENERATE_TYPES = false;
 function applyHook(hook, table, values, lateral) {
     return (Array.isArray(values)
-        ? values.map((v) => applyHookSingle(hook, table, v, lateral))
+        ? // A passthru lateral under `select` aggregates to an array with a null for
+            // every parent row the lateral missed; Object.entries(null) would throw a bare
+            // TypeError out of the serde walk. Nothing to deserialize, so pass it through.
+            values.map((v) => (v == null ? v : applyHookSingle(hook, table, v, lateral)))
         : applyHookSingle(hook, table, values, lateral));
+}
+/**
+ * A keyed lateral came back NULL. If the sub-query was a `selectExactlyOne`, that
+ * is a broken promise — the field is typed non-optional but holds nothing — so we
+ * throw, which is what the call site already claims happens.
+ *
+ * Anything else (`selectOne`, `select`, `count`) may legitimately be absent, and is
+ * left alone.
+ */
+function assertLateralPresent(parentTable, lateralKey, subQ) {
+    if (!(subQ instanceof core_1.SQLFragment) || subQ.selectResultMode !== core_1.SelectResultMode.ExactlyOne)
+        return;
+    throw new core_1.NotExactlyOneError(
+    // A copy, not subQ itself, for two reasons. The sub-query as stored in the
+    // `lateral` object has no parentTable — select() sets that on a defensive copy
+    // (upstream 6e64759) precisely so the original is not mutated — so compiling
+    // the original throws "table alias has no meaning here" the moment it uses
+    // db.parent(), making the hint below a lie. And mutating it here would
+    // reintroduce the sticky-parent bug that copy() exists to prevent.
+    // `instanceof` narrows to SQLFragment<any, any> while NotExactlyOneError.query
+    // uses the default generics; Constraint is a phantom field, so the cast only
+    // reconciles type parameters.
+    subQ.copy({ parentTable }), `One result expected for lateral '${lateralKey}' on '${parentTable}' but none returned ` +
+        '(hint: check `.query.compile()` on this Error)');
 }
 function applyHookSingle(hook, table, values, lateral) {
     var _a;
@@ -60,9 +87,15 @@ function applyHookSingle(hook, table, values, lateral) {
         }
         else {
             for (const [k, subQ] of Object.entries(lateral)) {
-                processed[k] = processed[k]
-                    ? applyHook(hook, k, processed[k], subQ)
-                    : processed[k];
+                const value = processed[k];
+                if (value === null || value === undefined) {
+                    // A lateral is `LEFT JOIN LATERAL ... ON true`, so a missing row is NULL
+                    // regardless of mode, and the sub-query's own ExactlyOne check never runs
+                    // (a lateral is never `.run()`). This is the only place that can catch it.
+                    assertLateralPresent(table, k, subQ);
+                    continue; // selectOne / select: an absent row is legal, leave the null in place
+                }
+                processed[k] = applyHook(hook, k, value, subQ);
             }
         }
     }
